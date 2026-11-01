@@ -1,1 +1,186 @@
-hi
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure Local OpenAI Server",
+        "data": {
+          "server_name": "Server Name",
+          "base_url": "Server URL",
+          "api_key": "API key"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not communicate with the server",
+      "unknown": "An unknown error occurred"
+    },
+    "abort": {
+      "already_configured": "Already configured"
+    }
+  },
+  "config_subentries": {
+    "conversation": {
+      "step": {
+        "user": {
+          "title": "Configure the new conversation agent",
+          "data": {
+            "model": "Model",
+            "prompt": "System Prompt",
+            "llm_hass_api": "Tool Providers",
+            "strip_emojis": "Strip emojis from the response",
+            "strip_emphasis": "Strip Markdown emphasis markers from the response",
+            "strip_latex": "Strip LaTeX commands from the response",
+            "temperature": "Temperature",
+            "manual_prompting": "Full manual prompting",
+            "parallel_tool_calls": "Parallel tool calling"
+          },
+          "data_description": {
+            "model": "The model to use for the conversation agent",
+            "prompt": "Instruct how the LLM should respond. This can be a template."
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure the conversation agent",
+          "data": {
+            "model": "Model",
+            "prompt": "System Prompt",
+            "llm_hass_api": "Tool Providers",
+            "strip_emojis": "Strip emojis from the response",
+            "strip_emphasis": "Strip Markdown emphasis markers from the response",
+            "strip_latex": "Strip LaTeX commands from the response",
+            "temperature": "Temperature",
+            "manual_prompting": "Full manual prompting",
+            "parallel_tool_calls": "Parallel tool calling"
+          },
+          "data_description": {
+            "model": "The model to use for the conversation agent",
+            "prompt": "Instruct how the LLM should respond. This can be a template."
+          }
+        }
+      },
+      "initiate_flow": {
+        "user": "Add conversation agent"
+      },
+      "entry_type": "Conversation agent",
+      "abort": {
+        "cannot_connect": "Could not communicate with the server",
+        "unknown": "An unknown error occurred",
+        "reconfigure_successful": "Conversation Agent has been reconfigured"
+      }
+    },
+    "ai_task_data": {
+      "step": {
+        "user": {
+          "title": "Configure the new AI task agent",
+          "data": {
+            "model": "Model",
+            "generate_data": "Generate data based on instructions",
+            "generate_image": "Generate images based on instructions",
+            "support_attachments": "Support attachments with generate data",
+            "strip_emojis": "Strip emojis from the response",
+            "strip_emphasis": "Strip Markdown emphasis markers from the response",
+            "strip_latex": "Strip LaTeX commands from the response",
+            "temperature": "Temperature"
+          },
+          "data_description": {
+            "model": "The model to use for the AI Task agent"
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure the AI task agent",
+          "data": {
+            "model": "Model",
+            "generate_data": "Generate data based on instructions",
+            "generate_image": "Generate images based on instructions",
+            "support_attachments": "Support attachments with generate data",
+            "strip_emojis": "Strip emojis from the response",
+            "strip_emphasis": "Strip Markdown emphasis markers from the response",
+            "strip_latex": "Strip LaTeX commands from the response",
+            "temperature": "Temperature"
+          },
+          "data_description": {
+            "model": "The model to use for the AI Task agent"
+          }
+        }
+      },
+      "initiate_flow": {
+        "user": "Add AI task"
+      },
+      "entry_type": "AI task",
+      "abort": {
+        "cannot_connect": "Could not communicate with the server",
+        "unknown": "An unknown error occurred",
+        "reconfigure_successful": "AI Task Agent has been reconfigured"
+      }
+    },
+    "ai_image": {
+      "step": {
+        "user": {
+          "title": "Configure the new AI image generator",
+          "data": {
+            "model": "Image model",
+            "image_size": "Image size",
+            "image_quality": "Quality",
+            "image_format": "File format",
+            "image_response_format": "Response format",
+            "support_attachments": "Allow attached images (image edit / image-to-image)",
+            "save_images": "Save generated images to disk",
+            "save_path": "Save folder",
+            "filename_template": "Filename template"
+          },
+          "data_description": {
+            "model": "The image model on your server (e.g. gpt-image-1, dall-e-3, or your Stable Diffusion / Gemini model)",
+            "image_size": "e.g. 1024x1024. 'auto' lets the server decide. You can type a custom size.",
+            "image_quality": "'auto' sends nothing. Use low/medium/high for gpt-image, standard/hd for dall-e-3.",
+            "image_format": "png is the default and works everywhere. Only change it if your server supports it.",
+            "image_response_format": "b64_json works on most local servers. Use 'omit' for gpt-image-1 style servers that reject this setting, or 'url' if your server only returns links.",
+            "support_attachments": "Lets automations/services send a photo along with the prompt (uses /images/edits). Your server must support it.",
+            "save_images": "Every image gets a copy written to the folder below, on top of Home Assistant's normal handling.",
+            "save_path": "Folder must be inside /config/www or /media, or listed in allowlist_external_dirs. Files in /config/www show up at /local/...",
+            "filename_template": "Placeholders: {date} {time} {timestamp} {slug} {name} {model}. The file extension is added automatically."
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure the AI image generator",
+          "data": {
+            "model": "Image model",
+            "image_size": "Image size",
+            "image_quality": "Quality",
+            "image_format": "File format",
+            "image_response_format": "Response format",
+            "support_attachments": "Allow attached images (image edit / image-to-image)",
+            "save_images": "Save generated images to disk",
+            "save_path": "Save folder",
+            "filename_template": "Filename template"
+          },
+          "data_description": {
+            "model": "The image model on your server (e.g. gpt-image-1, dall-e-3, or your Stable Diffusion / Gemini model)",
+            "image_size": "e.g. 1024x1024. 'auto' lets the server decide. You can type a custom size.",
+            "image_quality": "'auto' sends nothing. Use low/medium/high for gpt-image, standard/hd for dall-e-3.",
+            "image_format": "png is the default and works everywhere. Only change it if your server supports it.",
+            "image_response_format": "b64_json works on most local servers. Use 'omit' for gpt-image-1 style servers that reject this setting, or 'url' if your server only returns links.",
+            "support_attachments": "Lets automations/services send a photo along with the prompt (uses /images/edits). Your server must support it.",
+            "save_images": "Every image gets a copy written to the folder below, on top of Home Assistant's normal handling.",
+            "save_path": "Folder must be inside /config/www or /media, or listed in allowlist_external_dirs. Files in /config/www show up at /local/...",
+            "filename_template": "Placeholders: {date} {time} {timestamp} {slug} {name} {model}. The file extension is added automatically."
+          }
+        }
+      },
+      "error": {
+        "path_not_allowed": "Home Assistant isn't allowed to write to this folder. Use a folder under /config/www or /media, or add it to allowlist_external_dirs."
+      },
+      "initiate_flow": {
+        "user": "Add AI image generator"
+      },
+      "entry_type": "AI image generator",
+      "abort": {
+        "cannot_connect": "Could not communicate with the server",
+        "unknown": "An unknown error occurred",
+        "reconfigure_successful": "AI Image generator has been reconfigured"
+      }
+    }
+  },
+  "exceptions": {
+    "unsupported_attachment_type": "This model does not support the attached file type."
+  }
+}
