@@ -302,6 +302,18 @@ class PersonalAIImageEntity(
                 result = await client.images.edit(image=images, prompt=prompt, **kwargs)
             else:
                 result = await client.images.generate(prompt=prompt, **kwargs)
+        except openai.NotFoundError as err:
+            endpoint = "images/edits" if attachments else "images/generations"
+            url = f"{str(client.base_url).rstrip('/')}/{endpoint}"
+            hint = (
+                " Your server has no image-edit endpoint: turn off 'Allow attached images' "
+                "on this AI image generator, or don't send an attachment."
+                if attachments
+                else " Check the Server URL ends in /v1 and that your server version supports "
+                "image generation (open <server>/docs in a browser and look for it)."
+            )
+            LOGGER.error("Image endpoint not found: %s", url)
+            raise HomeAssistantError(f"Server returned 404 Not Found for {url}.{hint}") from err
         except openai.OpenAIError as err:
             LOGGER.error("Error requesting image from API: %s", err)
             raise HomeAssistantError(f"Error talking to image API: {err}") from err
