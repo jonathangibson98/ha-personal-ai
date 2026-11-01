@@ -1,4 +1,4 @@
-"""Base entity for Local OpenAI."""
+"""Base entity for Personal AI."""
 
 from __future__ import annotations
 
@@ -30,8 +30,8 @@ from openai.types.responses.response_output_item import ImageGenerationCall
 from openai.types.responses.tool_param import ImageGeneration
 from openai.types.shared_params import ResponseFormatJSONSchema
 
-from . import LocalAiConfigEntry
-from .const import DOMAIN, LOGGER, MAX_TOOL_ITERATIONS, LocalAiConfigKey
+from . import PersonalAiConfigEntry
+from .const import DOMAIN, LOGGER, MAX_TOOL_ITERATIONS, PersonalAiConfigKey
 from .helpers import (
     _convert_completion_messages_to_response_input,
     _convert_content_to_chat_message,
@@ -45,12 +45,12 @@ from .helpers import (
 from .prompt import format_custom_prompt
 
 
-class LocalAiEntity(Entity):
-    """Base entity for Local OpenAI."""
+class PersonalAiEntity(Entity):
+    """Base entity for Personal AI."""
 
     _attr_has_entity_name = True
 
-    def __init__(self, entry: LocalAiConfigEntry, subentry: ConfigSubentry) -> None:
+    def __init__(self, entry: PersonalAiConfigEntry, subentry: ConfigSubentry) -> None:
         """Initialize the entity."""
         self.entry = entry
         self.subentry = subentry
@@ -58,7 +58,7 @@ class LocalAiEntity(Entity):
         self._attr_device_info = dr.DeviceInfo(
             identifiers={(DOMAIN, subentry.subentry_id)},
             name=subentry.title,
-            manufacturer="Local OpenAI",
+            manufacturer="Personal AI",
             model=subentry.data.get(CONF_MODEL, "Local"),
             entry_type=dr.DeviceEntryType.SERVICE,
         )
@@ -78,15 +78,15 @@ class LocalAiEntity(Entity):
     ) -> None:
         """Generate an answer for the chat log."""
         options = self.subentry.data
-        strip_emojis = bool(options.get(LocalAiConfigKey.STRIP_EMOJIS))
-        strip_emphasis = bool(options.get(LocalAiConfigKey.STRIP_EMPHASIS))
-        strip_latex = bool(options.get(LocalAiConfigKey.STRIP_LATEX))
+        strip_emojis = bool(options.get(PersonalAiConfigKey.STRIP_EMOJIS))
+        strip_emphasis = bool(options.get(PersonalAiConfigKey.STRIP_EMPHASIS))
+        strip_latex = bool(options.get(PersonalAiConfigKey.STRIP_LATEX))
         if structure is not None:
             strip_emphasis = False
             strip_latex = False
-        raw_temp = options.get(LocalAiConfigKey.TEMPERATURE, 1)
+        raw_temp = options.get(PersonalAiConfigKey.TEMPERATURE, 1)
         temperature = float(raw_temp) if isinstance(raw_temp, int | float) else 1.0
-        parallel_tool_calls = bool(options.get(LocalAiConfigKey.PARALLEL_TOOL_CALLS, True))
+        parallel_tool_calls = bool(options.get(PersonalAiConfigKey.PARALLEL_TOOL_CALLS, True))
 
         tools: list[ChatCompletionFunctionToolParam] | None = None
         if chat_log.llm_api:
@@ -101,7 +101,7 @@ class LocalAiEntity(Entity):
             if (m := await _convert_content_to_chat_message(content, self.model)) is not None
         ]
 
-        if options.get(LocalAiConfigKey.MANUAL_PROMPTING, False) and user_input:
+        if options.get(PersonalAiConfigKey.MANUAL_PROMPTING, False) and user_input:
             prompt = format_custom_prompt(
                 self.hass, str(options.get(CONF_PROMPT, "")), user_input, tools
             ).strip()

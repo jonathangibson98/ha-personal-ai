@@ -1,13 +1,14 @@
 {
   "domain": "personal_ai",
   "name": "Personal AI",
-  "documentation": "https://github.com/yourusername/ha-personal-ai",
-  "issue_tracker": "https://github.com/yourusername/ha-personal-ai/issues",
-  "dependencies": [],
-  "codeowners": ["@yourusername"],
-  "requirements": [],
-  "version": "1.0.0",
+  "after_dependencies": ["assist_pipeline", "intent"],
+  "codeowners": ["@jonathangibson98"],
+  "config_flow": true,
+  "dependencies": ["conversation"],
+  "documentation": "https://github.com/jonathangibson98/ha-personal-ai",
+  "integration_type": "service",
   "iot_class": "cloud_polling",
-  "logo": "https://raw.githubusercontent.com/yourusername/ha-personal-ai/main/custom_components/personal_ai/logo.png",
-  "icon": "https://raw.githubusercontent.com/yourusername/ha-personal-ai/main/custom_components/personal_ai/icon.png"
+  "issue_tracker": "https://github.com/jonathangibson98/ha-personal-ai/issues",
+  "requirements": ["demoji", "openai", "pylatexenc", "webcolors"],
+  "version": "1.0.0"
 }

@@ -1,4 +1,4 @@
-"""AI Task integration for Local OpenAI LLM."""
+"""AI Task integration for Personal AI."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.httpx_client import get_async_client
 from openai.types.responses.response_output_item import ImageGenerationCall
 
-from . import LocalAiConfigEntry
+from . import PersonalAiConfigEntry
 from .const import (
     DEFAULT_IMAGE_FILENAME_TEMPLATE,
     DEFAULT_IMAGE_FORMAT,
@@ -26,10 +26,10 @@ from .const import (
     EVENT_IMAGE_SAVED,
     IMAGE_TIMEOUT,
     LOGGER,
-    LocalAiConfigKey,
-    LocalAiSubentryType,
+    PersonalAiConfigKey,
+    PersonalAiSubentryType,
 )
-from .entity import LocalAiEntity
+from .entity import PersonalAiEntity
 from .helpers import _clean_json_data
 from .image_storage import (
     async_save_image,
@@ -41,42 +41,42 @@ from .image_storage import (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: LocalAiConfigEntry,
+    config_entry: PersonalAiConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up AI Task entities."""
     for subentry in config_entry.subentries.values():
-        if subentry.subentry_type == LocalAiSubentryType.AI_TASK_DATA:
+        if subentry.subentry_type == PersonalAiSubentryType.AI_TASK_DATA:
             async_add_entities(
-                [LocalAITaskEntity(config_entry, subentry)],
+                [PersonalAITaskEntity(config_entry, subentry)],
                 config_subentry_id=subentry.subentry_id,
             )
-        elif subentry.subentry_type == LocalAiSubentryType.AI_IMAGE:
+        elif subentry.subentry_type == PersonalAiSubentryType.AI_IMAGE:
             async_add_entities(
-                [LocalAIImageEntity(config_entry, subentry)],
+                [PersonalAIImageEntity(config_entry, subentry)],
                 config_subentry_id=subentry.subentry_id,
             )
 
 
-class LocalAITaskEntity(
-    LocalAiEntity,
+class PersonalAITaskEntity(
+    PersonalAiEntity,
     ai_task.AITaskEntity,
 ):
-    """Local OpenAI LLM AI Task entity."""
+    """Personal AI AI Task entity."""
 
     _attr_name = None
 
-    def __init__(self, entry: LocalAiConfigEntry, subentry: ConfigSubentry) -> None:
+    def __init__(self, entry: PersonalAiConfigEntry, subentry: ConfigSubentry) -> None:
         """Initialize the AI Task entity."""
         ai_task.AITaskEntity.__init__(self)
-        LocalAiEntity.__init__(self, entry, subentry)
+        PersonalAiEntity.__init__(self, entry, subentry)
 
         features = ai_task.AITaskEntityFeature(0)
-        if subentry.data.get(LocalAiConfigKey.SUPPORT_ATTACHMENTS, True):
+        if subentry.data.get(PersonalAiConfigKey.SUPPORT_ATTACHMENTS, True):
             features |= ai_task.AITaskEntityFeature.SUPPORT_ATTACHMENTS
-        if subentry.data.get(LocalAiConfigKey.GENERATE_DATA, True):
+        if subentry.data.get(PersonalAiConfigKey.GENERATE_DATA, True):
             features |= ai_task.AITaskEntityFeature.GENERATE_DATA
-        if subentry.data.get(LocalAiConfigKey.GENERATE_IMAGE, True):
+        if subentry.data.get(PersonalAiConfigKey.GENERATE_IMAGE, True):
             features |= ai_task.AITaskEntityFeature.GENERATE_IMAGE
         self._attr_supported_features = features
 
@@ -185,26 +185,26 @@ class LocalAITaskEntity(
         )
 
 
-class LocalAIImageEntity(
-    LocalAiEntity,
+class PersonalAIImageEntity(
+    PersonalAiEntity,
     ai_task.AITaskEntity,
 ):
     """Dedicated image-generation AI Task (OpenAI-style /v1/images endpoints).
 
     Unlike the combined AI Task above, this one talks to the plain Images API that
-    most local servers (LocalAI, stable-diffusion wrappers, Gemini-FastAPI, OpenAI
+    most local servers (PersonalAI, stable-diffusion wrappers, Gemini-FastAPI, OpenAI
     itself) expose, and it can save every image to a folder you choose.
     """
 
     _attr_name = None
 
-    def __init__(self, entry: LocalAiConfigEntry, subentry: ConfigSubentry) -> None:
+    def __init__(self, entry: PersonalAiConfigEntry, subentry: ConfigSubentry) -> None:
         """Initialize the AI Image entity."""
         ai_task.AITaskEntity.__init__(self)
-        LocalAiEntity.__init__(self, entry, subentry)
+        PersonalAiEntity.__init__(self, entry, subentry)
 
         features = ai_task.AITaskEntityFeature.GENERATE_IMAGE
-        if subentry.data.get(LocalAiConfigKey.SUPPORT_ATTACHMENTS, False):
+        if subentry.data.get(PersonalAiConfigKey.SUPPORT_ATTACHMENTS, False):
             features |= ai_task.AITaskEntityFeature.SUPPORT_ATTACHMENTS
         self._attr_supported_features = features
 
@@ -218,22 +218,22 @@ class LocalAIImageEntity(
         """Turn the saved options into kwargs for images.generate / images.edit."""
         kwargs: dict[str, Any] = {"model": self.model, "n": 1}
 
-        size = str(self._opt(LocalAiConfigKey.IMAGE_SIZE, DEFAULT_IMAGE_SIZE))
+        size = str(self._opt(PersonalAiConfigKey.IMAGE_SIZE, DEFAULT_IMAGE_SIZE))
         if size != "auto":
             kwargs["size"] = size
 
-        quality = str(self._opt(LocalAiConfigKey.IMAGE_QUALITY, DEFAULT_IMAGE_QUALITY))
+        quality = str(self._opt(PersonalAiConfigKey.IMAGE_QUALITY, DEFAULT_IMAGE_QUALITY))
         if quality != "auto":
             kwargs["quality"] = quality
 
         # Only send output_format when it's not the default; dall-e style servers
         # reject parameters they don't know.
-        image_format = str(self._opt(LocalAiConfigKey.IMAGE_FORMAT, DEFAULT_IMAGE_FORMAT))
+        image_format = str(self._opt(PersonalAiConfigKey.IMAGE_FORMAT, DEFAULT_IMAGE_FORMAT))
         if image_format != DEFAULT_IMAGE_FORMAT:
             kwargs["output_format"] = image_format
 
         response_format = str(
-            self._opt(LocalAiConfigKey.IMAGE_RESPONSE_FORMAT, DEFAULT_IMAGE_RESPONSE_FORMAT)
+            self._opt(PersonalAiConfigKey.IMAGE_RESPONSE_FORMAT, DEFAULT_IMAGE_RESPONSE_FORMAT)
         )
         if response_format != "omit":
             kwargs["response_format"] = response_format
@@ -367,14 +367,14 @@ class LocalAIImageEntity(
 
     async def _async_maybe_save(self, prompt: str, image_data: bytes, mime_type: str) -> None:
         """Save the image to the configured folder (if saving is on) and fire an event."""
-        if not self.subentry.data.get(LocalAiConfigKey.SAVE_IMAGES, True):
+        if not self.subentry.data.get(PersonalAiConfigKey.SAVE_IMAGES, True):
             return
 
-        directory = str(self._opt(LocalAiConfigKey.SAVE_PATH, default_save_path(self.hass)))
+        directory = str(self._opt(PersonalAiConfigKey.SAVE_PATH, default_save_path(self.hass)))
         filename = build_filename(
             str(
                 self._opt(
-                    LocalAiConfigKey.FILENAME_TEMPLATE, DEFAULT_IMAGE_FILENAME_TEMPLATE
+                    PersonalAiConfigKey.FILENAME_TEMPLATE, DEFAULT_IMAGE_FILENAME_TEMPLATE
                 )
             ),
             entity_name=self.subentry.title,

@@ -1,4 +1,4 @@
-"""Prompt building and formatting utilities for Local OpenAI LLM."""
+"""Prompt building and formatting utilities for Personal AI."""
 
 from __future__ import annotations
 

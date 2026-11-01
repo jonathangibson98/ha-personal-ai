@@ -1,4 +1,4 @@
-"""Helper utilities for Local OpenAI LLM integration."""
+"""Helper utilities for Personal AI integration."""
 
 from __future__ import annotations
 
