@@ -1,0 +1,255 @@
+"""Constants for the Local OpenAI LLM integration."""
+
+import logging
+import re
+from enum import StrEnum
+
+from homeassistant.const import CONF_LLM_HASS_API, CONF_PROMPT
+from homeassistant.helpers import llm
+
+DOMAIN = "local_openai"
+LOGGER = logging.getLogger(__package__)
+
+
+class LocalAiConfigKey:
+    """Configuration keys for Local OpenAI LLM."""
+
+    BASE_URL = "base_url"
+    GENERATE_DATA = "generate_data"
+    FILENAME_TEMPLATE = "filename_template"
+    GENERATE_IMAGE = "generate_image"
+    IMAGE_FORMAT = "image_format"
+    IMAGE_QUALITY = "image_quality"
+    IMAGE_RESPONSE_FORMAT = "image_response_format"
+    IMAGE_SIZE = "image_size"
+    MANUAL_PROMPTING = "manual_prompting"
+    PARALLEL_TOOL_CALLS = "parallel_tool_calls"
+    RECOMMENDED = "recommended"
+    SAVE_IMAGES = "save_images"
+    SAVE_PATH = "save_path"
+    SERVER_NAME = "server_name"
+    STRIP_EMOJIS = "strip_emojis"
+    STRIP_EMPHASIS = "strip_emphasis"
+    STRIP_LATEX = "strip_latex"
+    SUPPORT_ATTACHMENTS = "support_attachments"
+    TEMPERATURE = "temperature"
+
+
+class LocalAiSubentryType(StrEnum):
+    """Subentry types supported by Local OpenAI LLM."""
+
+    AI_IMAGE = "ai_image"
+    AI_TASK_DATA = "ai_task_data"
+    CONVERSATION = "conversation"
+
+
+RECOMMENDED_CONVERSATION_OPTIONS = {
+    LocalAiConfigKey.RECOMMENDED: True,
+    CONF_LLM_HASS_API: [llm.LLM_API_ASSIST],
+    CONF_PROMPT: llm.DEFAULT_INSTRUCTIONS_PROMPT,
+}
+
+# --- AI Image task defaults -------------------------------------------------
+# Default save folder lives under <config>/www so files are reachable at
+# http://<ha>:8123/local/local_openai/<file>. Users can point it anywhere that is
+# inside HA's allowlist_external_dirs (e.g. /media/ai_images).
+DEFAULT_IMAGE_SAVE_SUBDIR = "www/local_openai"
+DEFAULT_IMAGE_FILENAME_TEMPLATE = "{date}_{time}_{slug}"
+DEFAULT_IMAGE_SIZE = "1024x1024"
+DEFAULT_IMAGE_QUALITY = "auto"
+DEFAULT_IMAGE_FORMAT = "png"
+DEFAULT_IMAGE_RESPONSE_FORMAT = "b64_json"
+
+IMAGE_SIZE_OPTIONS = ("auto", "256x256", "512x512", "1024x1024", "1024x1536", "1536x1024")
+IMAGE_QUALITY_OPTIONS = ("auto", "low", "medium", "high", "standard", "hd")
+IMAGE_FORMAT_OPTIONS = ("png", "jpeg", "webp")
+# "omit" = don't send response_format at all (needed for gpt-image-1 style servers)
+IMAGE_RESPONSE_FORMAT_OPTIONS = ("b64_json", "url", "omit")
+
+EVENT_IMAGE_SAVED = f"{DOMAIN}_image_saved"
+
+MAX_TOOL_ITERATIONS = 10
+TIMEOUT = 10.0
+IMAGE_TIMEOUT = 300.0  # image models are slow, esp. on local GPUs
+
+CURRENCY_PATTERN = re.compile(r"\$\d+(?:,\d{3})*(?:\.\d+)?(?=\b|\s|[,\.;:!\?]|\Z)")
+CURRENCY_PLACEHOLDER_PREFIX = "\x00CURRENCY_"
+CURRENCY_PLACEHOLDER_SUFFIX = "\x00"
+
+THINK_OPEN_TAG = "<think>"
+THINK_CLOSE_TAG = "</think>"
+
+EMPHASIS_MARKERS = ("*", "_")
+MAX_EMPHASIS_MARKER_LEN = 3
+
+LATEX_MATH_SPAN = re.compile(
+    r"""
+    \$\$[\s\S]+?\$\$
+  | \$(?!\s)(?:\\.|[^\$\n\\])+?(?<!\s)\$
+  | \\\([\s\S]*?\\\)
+  | \\\[[\s\S]*?\\\]
+    """,
+    re.VERBOSE,
+)
+
+GEMINI_MIME_TYPES_SUPPORTED = (
+    "application/dart",
+    "application/ecmascript",
+    "application/gzip",
+    "application/json",
+    "application/msword",
+    "application/pdf",
+    "application/protobuf",
+    "application/typescript",
+    "application/vnd.apache.parquet",
+    "application/vnd.curl",
+    "application/vnd.ibm.secure-container",
+    "application/vnd.jupyter",
+    "application/vnd.ms-excel",
+    "application/vnd.oasis.opendocument.text",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
+    "application/x-csh",
+    "application/x-hwp",
+    "application/x-latex",
+    "application/x-php",
+    "application/x-powershell",
+    "application/x-sh",
+    "application/x-zsh",
+    "application/xml",
+    "application/zip",
+    "audio/G722",
+    "audio/L16",
+    "audio/MP4A-LATM",
+    "audio/aac",
+    "audio/adts",
+    "audio/aiff",
+    "audio/amr",
+    "audio/g723",
+    "audio/iLBC",
+    "audio/m4a",
+    "audio/mpeg",
+    "audio/ogg",
+    "audio/pcm",
+    "audio/wav",
+    "audio/x-ac3",
+    "audio/x-adpcm",
+    "audio/x-caf",
+    "audio/x-dca",
+    "audio/x-eac3",
+    "audio/x-flac",
+    "audio/x-gsm",
+    "audio/x-oma",
+    "audio/x-speex",
+    "audio/x-tta",
+    "audio/x-voc",
+    "audio/x-wavpack",
+    "image/avif",
+    "image/bmp",
+    "image/gif",
+    "image/heic",
+    "image/heif",
+    "image/jpeg",
+    "image/png",
+    "image/svg+xml",
+    "image/tiff",
+    "image/webp",
+    "image/x-adobe-dng",
+    "text/cache-manifest",
+    "text/calendar",
+    "text/css",
+    "text/csv",
+    "text/dns",
+    "text/html",
+    "text/javascript",
+    "text/jsx",
+    "text/markdown",
+    "text/plain",
+    "text/provenance-notation",
+    "text/rtf",
+    "text/sgml",
+    "text/shaclc",
+    "text/shex",
+    "text/spdx",
+    "text/tab-separated-values",
+    "text/texmacs",
+    "text/troff",
+    "text/tsx",
+    "text/turtle",
+    "text/uri-list",
+    "text/vcard",
+    "text/vnd.graphviz",
+    "text/vnd.in3d.3dml",
+    "text/vnd.in3d.spot",
+    "text/vnd.sun.j2me.app-descriptor",
+    "text/vnd.wap.wml",
+    "text/vnd.wap.wmlscript",
+    "text/vtt",
+    "text/wgsl",
+    "text/x-asm",
+    "text/x-bibtex",
+    "text/x-boo",
+    "text/x-c++hdr",
+    "text/x-c++src",
+    "text/x-cassandra",
+    "text/x-chdr",
+    "text/x-coffeescript",
+    "text/x-component",
+    "text/x-csharp",
+    "text/x-csrc",
+    "text/x-cuda",
+    "text/x-d",
+    "text/x-diff",
+    "text/x-emacs-lisp",
+    "text/x-erlang",
+    "text/x-gff3",
+    "text/x-go",
+    "text/x-haskell",
+    "text/x-java-properties",
+    "text/x-java-source",
+    "text/x-kotlin",
+    "text/x-lilypond",
+    "text/x-lisp",
+    "text/x-literate-haskell",
+    "text/x-lua",
+    "text/x-moc",
+    "text/x-objcsrc",
+    "text/x-pascal",
+    "text/x-perl",
+    "text/x-perl-script",
+    "text/x-python-script",
+    "text/x-r-markdown",
+    "text/x-rsrc",
+    "text/x-rst",
+    "text/x-ruby-script",
+    "text/x-rust",
+    "text/x-sass",
+    "text/x-scala",
+    "text/x-scheme",
+    "text/x-scss",
+    "text/x-setext",
+    "text/x-sfv",
+    "text/x-siesta",
+    "text/x-sos",
+    "text/x-sql",
+    "text/x-swift",
+    "text/x-tcl",
+    "text/x-tex",
+    "text/x-vbasic",
+    "text/x-vcalendar",
+    "text/yaml",
+    "video/3gpp",
+    "video/3gpp2",
+    "video/avi",
+    "video/mp4",
+    "video/mpeg",
+    "video/mpg",
+    "video/quicktime",
+    "video/webm",
+    "video/x-flv",
+    "video/x-m4v",
+    "video/x-matroska",
+    "video/x-ms-wmv",
+)
