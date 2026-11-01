@@ -1,82 +1,48 @@
-"""Conversation support for Local OpenAI LLM."""
+"""Conversation platform for Personal AI."""
+from __future__ import annotations
 
-from typing import Literal
-
+import logging
 from homeassistant.components import conversation
-from homeassistant.config_entries import ConfigSubentry
-from homeassistant.const import CONF_LLM_HASS_API, CONF_PROMPT, MATCH_ALL
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import llm
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import LocalAiConfigEntry
-from .const import DOMAIN, LOGGER, LocalAiSubentryType
-from .entity import LocalAiEntity
+from .const import DOMAIN, CONF_PROMPT, DEFAULT_PROMPT
 
+_LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: LocalAiConfigEntry,
-    async_add_entities: AddConfigEntryEntitiesCallback,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up conversation entities."""
-    for subentry_id, subentry in config_entry.subentries.items():
-        if subentry.subentry_type != LocalAiSubentryType.CONVERSATION:
-            continue
-        async_add_entities(
-            [LocalAiConversationEntity(config_entry, subentry)],
-            config_subentry_id=subentry_id,
-        )
+    """Set up the Personal AI conversation entity."""
+    async_add_entities([PersonalAIConversationEntity(config_entry)])
 
+class PersonalAIConversationEntity(conversation.ConversationEntity):
+    """Personal AI conversation agent."""
 
-class LocalAiConversationEntity(LocalAiEntity, conversation.ConversationEntity):
-    """Local OpenAI LLM conversation agent."""
-
-    _attr_name = None
-    _attr_supports_streaming = True
-
-    def __init__(self, entry: LocalAiConfigEntry, subentry: ConfigSubentry) -> None:
+    def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize the agent."""
-        super().__init__(entry, subentry)
-        if self.subentry.data.get(CONF_LLM_HASS_API):
-            self._attr_supported_features = conversation.ConversationEntityFeature.CONTROL
+        self._config_entry = config_entry
+        self._attr_name = "Personal AI"
+        self._attr_unique_id = f"{config_entry.entry_id}-conversation"
 
     @property
-    def supported_languages(self) -> list[str] | Literal["*"]:
-        """Return a list of supported languages."""
-        return MATCH_ALL
+    def supported_languages(self) -> list[str] | str:
+        """Return supported languages."""
+        return "*"
 
-    async def _async_handle_message(
-        self,
-        user_input: conversation.ConversationInput,
-        chat_log: conversation.ChatLog,
+    async def async_process(
+        self, user_input: conversation.ConversationInput
     ) -> conversation.ConversationResult:
-        """Process the user input and call the API."""
-        LOGGER.debug("Received user input: %s", user_input)
-        LOGGER.debug("Initial chat log: %s", chat_log)
-        options = self.subentry.data
-        system_prompt = options.get(CONF_PROMPT)
-
-        hass_apis = [api.id for api in llm.async_get_apis(self.hass)]
-
-        llm_apis = options.get(CONF_LLM_HASS_API, [])
-        llm_apis = [api for api in llm_apis if api in hass_apis]
-        LOGGER.debug("System prompt: %s", system_prompt)
-        LOGGER.debug("LLM APIs available: %s", llm_apis)
-
-        try:
-            await chat_log.async_provide_llm_data(
-                user_input.as_llm_context(DOMAIN),
-                llm_apis,
-                system_prompt,
-                user_input.extra_system_prompt,
-            )
-        except conversation.ConverseError as err:
-            LOGGER.error("Error during conversation setup: %s", err)
-            return err.as_conversation_result()
-
-        await self._async_handle_chat_log(chat_log, user_input=user_input)
-
-        result = conversation.async_get_result_from_chat_log(user_input, chat_log)
-        LOGGER.debug("Final conversation result: %s", result)
-        return result
+        """Process a conversation input."""
+        response_text = f"Personal AI processed: '{user_input.text}'"
+        
+        intent_response = conversation.IntentResponse(language=user_input.language)
+        intent_response.async_set_speech(response_text)
+        
+        return conversation.ConversationResult(
+            response=intent_response,
+            conversation_id=user_input.conversation_id,
+        )

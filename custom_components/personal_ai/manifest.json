@@ -1,13 +1,13 @@
 {
-  "domain": "local_openai",
-  "name": "Local OpenAI LLM",
-  "after_dependencies": ["assist_pipeline", "intent"],
-  "codeowners": ["@skye-harris", "@luuquangvu"],
-  "config_flow": true,
-  "dependencies": ["conversation"],
-  "documentation": "https://github.com/luuquangvu/hass_local_openai_llm",
-  "integration_type": "service",
-  "iot_class": "local_push",
-  "requirements": ["demoji", "openai", "pylatexenc", "webcolors"],
-  "version": "1.4.0"
+  "domain": "personal_ai",
+  "name": "Personal AI",
+  "documentation": "https://github.com/yourusername/ha-personal-ai",
+  "issue_tracker": "https://github.com/yourusername/ha-personal-ai/issues",
+  "dependencies": [],
+  "codeowners": ["@yourusername"],
+  "requirements": [],
+  "version": "1.0.0",
+  "iot_class": "cloud_polling",
+  "logo": "https://raw.githubusercontent.com/yourusername/ha-personal-ai/main/custom_components/personal_ai/logo.png",
+  "icon": "https://raw.githubusercontent.com/yourusername/ha-personal-ai/main/custom_components/personal_ai/icon.png"
 }
