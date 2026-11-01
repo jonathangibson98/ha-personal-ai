@@ -1,7 +1,5 @@
 {
-  "name": "Local OpenAI LLM",
-  "hide_default_branch": false,
-  "homeassistant": "2025.7",
-  "hacs": "2.0.5",
-  "render_readme": true
+  "name": "Personal AI",
+  "render_readme": true,
+  "homeassistant": "2024.1.0"
 }
