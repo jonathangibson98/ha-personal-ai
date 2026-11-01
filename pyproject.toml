@@ -1,7 +1,7 @@
 [project]
-name = "local_openai"
-version = "1.4.0"
-description = "Home Assistant integration for the Gemini-FastAPI and any OpenAI-compatible services"
+name = "personal_ai"
+version = "1.0.0"
+description = "Home Assistant Personal AI: conversation, AI tasks and image generation for any OpenAI-compatible server"
 readme = "README.md"
 requires-python = ">=3.14.2"
 dependencies = ["demoji", "openai<3", "pylatexenc", "webcolors"]
@@ -18,7 +18,7 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/luuquangvu/hass_local_openai_llm"
+Repository = "https://github.com/jonathangibson98/ha-personal-ai"
 
 [tool.ruff]
 line-length = 100
