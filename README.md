@@ -14,6 +14,8 @@ Gemini-FastAPI, and so on.
 ## Features
 
 - **Conversation agent** for Assist, with tool calling (it can control your devices), streaming, and a system prompt template.
+- **Normal AI conversation**: ask it anything, not just about your house. Pick *Hybrid*, *Home control* or *Plain chat* per agent.
+- **Google web search**: the AI searches Google (and can open the pages) when it needs current information, such as news, scores, prices, opening hours.
 - **AI Task (data)** for `ai_task.generate_data`, including structured output and image attachments.
 - **AI Image generator** for `ai_task.generate_image`, using the standard `/v1/images` endpoints. Pick the size, quality, and format, **choose the folder images are saved to**, and name files with a template.
 - **TTS-friendly output**: strips emojis, Markdown emphasis, and LaTeX so announcements sound clean.
@@ -35,6 +37,31 @@ Gemini-FastAPI, and so on.
    - **Server URL**: must end in `/v1`. Prefilled with `https://api.openai.com/v1`; for a local server use something like `http://192.168.1.50:1234/v1`.
    - **API Key**: required for OpenAI, usually blank for local servers.
 3. On the new entry, click **Add conversation agent**, **Add AI task**, and/or **Add AI image generator**. One server can have as many of each as you want.
+
+## Conversation modes
+
+Each conversation agent has a **Conversation mode**:
+
+| Mode | Behaviour |
+| --- | --- |
+| **Hybrid** (default) | Chats about anything from the model's own knowledge and uses your devices only when you ask it to control or check something. |
+| **Home control only** | The classic Assist behaviour: a smart-home voice assistant. |
+| **Plain chat** | A normal AI chatbot with no access to your entities or devices. |
+
+If the **System Prompt** is left empty (or still holds the old stock Assist prompt), a built-in prompt for the chosen mode is used. Write your own prompt to override it. For Hybrid and Home control, **Tool Providers** still decides which Home Assistant tools (normally *Assist*) the agent may use.
+
+## Web search
+
+Turn on **Enable web search (Google)** on a conversation agent and pick a provider:
+
+| Provider | Notes |
+| --- | --- |
+| **Serper** (default) | Real Google results through [serper.dev](https://serper.dev). Sign up, copy the API key, paste it into *Search API key*. Has a free tier. |
+| **Google Custom Search** | Needs an API key **and** the search engine ID (`cx`). Google has closed this API to new customers and ends it on 1 January 2027, so use Serper unless you already have a key. |
+
+The model decides when to search, so "what's the capital of France" is answered directly while "who won the match last night" triggers a search. With **Allow opening web pages** on, it can also read a result in full. Pages on private or local addresses are never opened, so a web page cannot make the AI poke at your home network.
+
+Pick a model that supports tool calling. The prompt tells the AI to keep answers short and never read out web addresses, and the Voice Chat add-on strips any that slip through, so it works well by voice.
 
 ## AI image generator
 
