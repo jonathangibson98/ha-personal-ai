@@ -32,11 +32,26 @@
             "strip_latex": "Strip LaTeX commands from the response",
             "temperature": "Temperature",
             "manual_prompting": "Full manual prompting",
-            "parallel_tool_calls": "Parallel tool calling"
+            "parallel_tool_calls": "Parallel tool calling",
+            "conversation_mode": "Conversation mode",
+            "web_search": "Enable web search (Google)",
+            "search_provider": "Search provider",
+            "search_api_key": "Search API key",
+            "search_engine_id": "Search engine ID (Google CSE only)",
+            "search_max_results": "Results per search",
+            "read_webpages": "Allow opening web pages"
           },
           "data_description": {
             "model": "The model to use for the conversation agent",
-            "prompt": "Instruct how the LLM should respond. This can be a template."
+            "prompt": "Leave empty to use the built-in prompt for the selected mode. This can be a template.",
+            "conversation_mode": "Hybrid chats about anything and controls the home when asked. Home control keeps the classic Assist behaviour. Plain chat never touches your devices.",
+            "llm_hass_api": "Which Home Assistant tools the agent may use (ignored in plain chat mode).",
+            "web_search": "Lets the AI search Google when it needs current information. Needs a search API key.",
+            "search_provider": "Serper returns Google results and works for new accounts (serper.dev, free tier). Google CSE only works for accounts that already have a key, and Google ends it on 1 Jan 2027.",
+            "search_api_key": "The API key from your search provider.",
+            "search_engine_id": "The 'cx' value of your Programmable Search Engine. Not used by Serper.",
+            "search_max_results": "How many results the AI sees per search.",
+            "read_webpages": "Lets the AI open a search result to read the full page. Local and private addresses are always blocked."
           }
         },
         "reconfigure": {
@@ -50,11 +65,26 @@
             "strip_latex": "Strip LaTeX commands from the response",
             "temperature": "Temperature",
             "manual_prompting": "Full manual prompting",
-            "parallel_tool_calls": "Parallel tool calling"
+            "parallel_tool_calls": "Parallel tool calling",
+            "conversation_mode": "Conversation mode",
+            "web_search": "Enable web search (Google)",
+            "search_provider": "Search provider",
+            "search_api_key": "Search API key",
+            "search_engine_id": "Search engine ID (Google CSE only)",
+            "search_max_results": "Results per search",
+            "read_webpages": "Allow opening web pages"
           },
           "data_description": {
             "model": "The model to use for the conversation agent",
-            "prompt": "Instruct how the LLM should respond. This can be a template."
+            "prompt": "Leave empty to use the built-in prompt for the selected mode. This can be a template.",
+            "conversation_mode": "Hybrid chats about anything and controls the home when asked. Home control keeps the classic Assist behaviour. Plain chat never touches your devices.",
+            "llm_hass_api": "Which Home Assistant tools the agent may use (ignored in plain chat mode).",
+            "web_search": "Lets the AI search Google when it needs current information. Needs a search API key.",
+            "search_provider": "Serper returns Google results and works for new accounts (serper.dev, free tier). Google CSE only works for accounts that already have a key, and Google ends it on 1 Jan 2027.",
+            "search_api_key": "The API key from your search provider.",
+            "search_engine_id": "The 'cx' value of your Programmable Search Engine. Not used by Serper.",
+            "search_max_results": "How many results the AI sees per search.",
+            "read_webpages": "Lets the AI open a search result to read the full page. Local and private addresses are always blocked."
           }
         }
       },
@@ -66,6 +96,10 @@
         "cannot_connect": "Could not communicate with the server",
         "unknown": "An unknown error occurred",
         "reconfigure_successful": "Conversation Agent has been reconfigured"
+      },
+      "error": {
+        "search_api_key_required": "Enter the API key for your search provider, or turn web search off.",
+        "search_engine_id_required": "Google Custom Search needs the search engine ID (cx)."
       }
     },
     "ai_task_data": {
@@ -182,5 +216,20 @@
   },
   "exceptions": {
     "unsupported_attachment_type": "This model does not support the attached file type."
+  },
+  "selector": {
+    "conversation_mode": {
+      "options": {
+        "hybrid": "Hybrid: chat about anything and control the home",
+        "home": "Home control only (classic Assist)",
+        "chat": "Plain chat (no access to the home)"
+      }
+    },
+    "search_provider": {
+      "options": {
+        "serper": "Serper (Google results)",
+        "google_cse": "Google Custom Search (legacy)"
+      }
+    }
   }
 }

@@ -16,7 +16,7 @@ else:
 
 from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigSubentry
-from homeassistant.const import CONF_MODEL, CONF_PROMPT
+from homeassistant.const import CONF_MODEL
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import Entity
@@ -42,7 +42,7 @@ from .helpers import (
     _strip_emphasis_markers,
     _transform_stream,
 )
-from .prompt import format_custom_prompt
+from .prompt import format_custom_prompt, resolve_prompt
 
 
 class PersonalAiEntity(Entity):
@@ -103,7 +103,7 @@ class PersonalAiEntity(Entity):
 
         if options.get(PersonalAiConfigKey.MANUAL_PROMPTING, False) and user_input:
             prompt = format_custom_prompt(
-                self.hass, str(options.get(CONF_PROMPT, "")), user_input, tools
+                self.hass, resolve_prompt(options), user_input, tools
             ).strip()
             new_system_message = ChatCompletionSystemMessageParam(role="system", content=prompt)
             found = False

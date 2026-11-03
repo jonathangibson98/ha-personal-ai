@@ -38,15 +38,22 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     TemplateSelector,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
 )
 from openai import AsyncOpenAI, OpenAIError
 
 from .const import (
+    CONVERSATION_MODES,
+    DEFAULT_CONVERSATION_MODE,
     DEFAULT_IMAGE_FILENAME_TEMPLATE,
     DEFAULT_IMAGE_FORMAT,
     DEFAULT_IMAGE_QUALITY,
     DEFAULT_IMAGE_RESPONSE_FORMAT,
     DEFAULT_IMAGE_SIZE,
+    DEFAULT_SEARCH_PROVIDER,
+    DEFAULT_SEARCH_RESULTS,
     DOMAIN,
     IMAGE_FORMAT_OPTIONS,
     IMAGE_QUALITY_OPTIONS,
@@ -54,7 +61,10 @@ from .const import (
     IMAGE_SIZE_OPTIONS,
     LOGGER,
     RECOMMENDED_CONVERSATION_OPTIONS,
+    SEARCH_PROVIDER_GOOGLE_CSE,
+    SEARCH_PROVIDERS,
     TIMEOUT,
+    WEB_SEARCH_API_PREFIX,
     PersonalAiConfigKey,
     PersonalAiSubentryType,
 )
@@ -150,7 +160,22 @@ class ConversationFlowHandler(PersonalAiSubentryFlowHandler):
                 value=api.id,
             )
             for api in llm.async_get_apis(self.hass)
+            if not api.id.startswith(WEB_SEARCH_API_PREFIX)
         ]
+
+    @staticmethod
+    def _validate(data: dict[str, object]) -> dict[str, str]:
+        """Check the web search settings are complete when search is switched on."""
+        errors: dict[str, str] = {}
+        if data.get(PersonalAiConfigKey.WEB_SEARCH):
+            if not str(data.get(PersonalAiConfigKey.SEARCH_API_KEY) or "").strip():
+                errors[PersonalAiConfigKey.SEARCH_API_KEY] = "search_api_key_required"
+            if (
+                data.get(PersonalAiConfigKey.SEARCH_PROVIDER) == SEARCH_PROVIDER_GOOGLE_CSE
+                and not str(data.get(PersonalAiConfigKey.SEARCH_ENGINE_ID) or "").strip()
+            ):
+                errors[PersonalAiConfigKey.SEARCH_ENGINE_ID] = "search_engine_id_required"
+        return errors
 
     async def get_schema(self, options: dict[str, object] | None = None):
         """Return the configuration schema for conversation options."""
@@ -200,8 +225,19 @@ class ConversationFlowHandler(PersonalAiSubentryFlowHandler):
                     SelectSelectorConfig(options=downloaded_models, custom_value=True)
                 ),
                 vol.Optional(
+                    PersonalAiConfigKey.CONVERSATION_MODE,
+                    default=options.get(
+                        PersonalAiConfigKey.CONVERSATION_MODE, DEFAULT_CONVERSATION_MODE
+                    ),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=list(CONVERSATION_MODES),
+                        translation_key="conversation_mode",
+                    )
+                ),
+                vol.Optional(
                     CONF_PROMPT,
-                    default=options.get(CONF_PROMPT, RECOMMENDED_CONVERSATION_OPTIONS[CONF_PROMPT]),
+                    description={"suggested_value": options.get(CONF_PROMPT) or ""},
                 ): TemplateSelector(),
                 vol.Optional(
                     CONF_LLM_HASS_API,
@@ -210,6 +246,41 @@ class ConversationFlowHandler(PersonalAiSubentryFlowHandler):
                         RECOMMENDED_CONVERSATION_OPTIONS[CONF_LLM_HASS_API],
                     ),
                 ): SelectSelector(SelectSelectorConfig(options=llm_apis, multiple=True)),
+                vol.Optional(
+                    PersonalAiConfigKey.WEB_SEARCH,
+                    default=options.get(PersonalAiConfigKey.WEB_SEARCH, False),
+                ): bool,
+                vol.Optional(
+                    PersonalAiConfigKey.SEARCH_PROVIDER,
+                    default=options.get(
+                        PersonalAiConfigKey.SEARCH_PROVIDER, DEFAULT_SEARCH_PROVIDER
+                    ),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=list(SEARCH_PROVIDERS),
+                        translation_key="search_provider",
+                    )
+                ),
+                vol.Optional(
+                    PersonalAiConfigKey.SEARCH_API_KEY,
+                    default=options.get(PersonalAiConfigKey.SEARCH_API_KEY, ""),
+                ): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD)),
+                vol.Optional(
+                    PersonalAiConfigKey.SEARCH_ENGINE_ID,
+                    default=options.get(PersonalAiConfigKey.SEARCH_ENGINE_ID, ""),
+                ): str,
+                vol.Optional(
+                    PersonalAiConfigKey.SEARCH_MAX_RESULTS,
+                    default=options.get(
+                        PersonalAiConfigKey.SEARCH_MAX_RESULTS, DEFAULT_SEARCH_RESULTS
+                    ),
+                ): NumberSelector(
+                    NumberSelectorConfig(min=1, max=10, step=1, mode=NumberSelectorMode.SLIDER)
+                ),
+                vol.Optional(
+                    PersonalAiConfigKey.READ_WEBPAGES,
+                    default=options.get(PersonalAiConfigKey.READ_WEBPAGES, True),
+                ): bool,
                 vol.Optional(
                     PersonalAiConfigKey.PARALLEL_TOOL_CALLS,
                     default=options.get(PersonalAiConfigKey.PARALLEL_TOOL_CALLS, True),
@@ -256,6 +327,11 @@ class ConversationFlowHandler(PersonalAiSubentryFlowHandler):
         else:
             user_input.pop(CONF_NAME, None)
 
+        if errors := self._validate(user_input):
+            return self.async_show_form(
+                step_id="user", data_schema=await self.get_schema(user_input), errors=errors
+            )
+
         raw_model = user_input.get(CONF_MODEL, "Local")
         model_name = self.strip_model_pathing(str(raw_model) if raw_model is not None else "Local")
         entry_title = custom_name or f"{model_name} AI Agent"
@@ -274,6 +350,13 @@ class ConversationFlowHandler(PersonalAiSubentryFlowHandler):
                 user_input[CONF_NAME] = custom_name
             else:
                 user_input.pop(CONF_NAME, None)
+
+            if errors := self._validate(user_input):
+                return self.async_show_form(
+                    step_id="reconfigure",
+                    data_schema=await self.get_schema(user_input),
+                    errors=errors,
+                )
 
             raw_model = user_input.get(CONF_MODEL, "Local")
             model_name = self.strip_model_pathing(

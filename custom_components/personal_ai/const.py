@@ -15,6 +15,7 @@ class PersonalAiConfigKey:
     """Configuration keys for Personal AI."""
 
     BASE_URL = "base_url"
+    CONVERSATION_MODE = "conversation_mode"
     GENERATE_DATA = "generate_data"
     FILENAME_TEMPLATE = "filename_template"
     GENERATE_IMAGE = "generate_image"
@@ -24,15 +25,21 @@ class PersonalAiConfigKey:
     IMAGE_SIZE = "image_size"
     MANUAL_PROMPTING = "manual_prompting"
     PARALLEL_TOOL_CALLS = "parallel_tool_calls"
+    READ_WEBPAGES = "read_webpages"
     RECOMMENDED = "recommended"
     SAVE_IMAGES = "save_images"
     SAVE_PATH = "save_path"
+    SEARCH_API_KEY = "search_api_key"
+    SEARCH_ENGINE_ID = "search_engine_id"
+    SEARCH_MAX_RESULTS = "search_max_results"
+    SEARCH_PROVIDER = "search_provider"
     SERVER_NAME = "server_name"
     STRIP_EMOJIS = "strip_emojis"
     STRIP_EMPHASIS = "strip_emphasis"
     STRIP_LATEX = "strip_latex"
     SUPPORT_ATTACHMENTS = "support_attachments"
     TEMPERATURE = "temperature"
+    WEB_SEARCH = "web_search"
 
 
 class PersonalAiSubentryType(StrEnum):
@@ -48,6 +55,47 @@ RECOMMENDED_CONVERSATION_OPTIONS = {
     CONF_LLM_HASS_API: [llm.LLM_API_ASSIST],
     CONF_PROMPT: llm.DEFAULT_INSTRUCTIONS_PROMPT,
 }
+
+# --- Conversation modes ------------------------------------------------------
+MODE_HYBRID = "hybrid"  # general chat + home control; the model picks per message
+MODE_HOME = "home"  # classic Assist behaviour, focused on the house
+MODE_CHAT = "chat"  # plain AI conversation, no access to home entities
+CONVERSATION_MODES = (MODE_HYBRID, MODE_HOME, MODE_CHAT)
+DEFAULT_CONVERSATION_MODE = MODE_HYBRID
+
+DATE_LINE = "Current date and time: {{ now().strftime('%A %d %B %Y, %H:%M') }}."
+VOICE_LINE = (
+    "Your replies may be read aloud, so keep them short and conversational, with no "
+    "Markdown, emojis, bullet lists or web addresses unless the user asks for detail."
+)
+
+MODE_PROMPTS = {
+    MODE_HYBRID: (
+        "You are a friendly, knowledgeable AI assistant that also looks after the user's smart "
+        "home. Hold natural conversations and answer general questions (facts, advice, writing, "
+        "maths, coding, recommendations, small talk) from your own knowledge. The home is only "
+        "one of the things you help with: never refuse or steer away from a question because it "
+        "is not about the house, and never say you can only talk about the home. Use the smart "
+        "home tools only when the user wants to control a device or asks about the current "
+        "state of the home.\n" + VOICE_LINE + "\n" + DATE_LINE
+    ),
+    MODE_HOME: llm.DEFAULT_INSTRUCTIONS_PROMPT,
+    MODE_CHAT: (
+        "You are a friendly, knowledgeable AI assistant. Hold natural conversations and answer "
+        "any question from your own knowledge: facts, advice, writing, maths, coding, "
+        "recommendations, small talk. You have no access to the user's home or devices, so if "
+        "asked to control or check something in the house, say that this assistant cannot do "
+        "that.\n" + VOICE_LINE + "\n" + DATE_LINE
+    ),
+}
+
+# --- Web search -------------------------------------------------------------
+SEARCH_PROVIDER_SERPER = "serper"  # Google results via serper.dev (works for new users)
+SEARCH_PROVIDER_GOOGLE_CSE = "google_cse"  # Google Programmable Search (closes 1 Jan 2027)
+SEARCH_PROVIDERS = (SEARCH_PROVIDER_SERPER, SEARCH_PROVIDER_GOOGLE_CSE)
+DEFAULT_SEARCH_PROVIDER = SEARCH_PROVIDER_SERPER
+DEFAULT_SEARCH_RESULTS = 5
+WEB_SEARCH_API_PREFIX = f"{DOMAIN}_web_search_"
 
 # --- AI Image task defaults -------------------------------------------------
 # Default save folder lives under <config>/www so files are reachable at

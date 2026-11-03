@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import webcolors
 from homeassistant.components import conversation
 from homeassistant.components.conversation.const import DOMAIN as CONVERSATION_DOMAIN
@@ -25,7 +27,15 @@ from homeassistant.helpers import (
 )
 from webcolors import CSS3
 
-from .const import LOGGER
+from homeassistant.const import CONF_PROMPT
+from homeassistant.helpers import llm
+
+from .const import (
+    DEFAULT_CONVERSATION_MODE,
+    LOGGER,
+    MODE_PROMPTS,
+    PersonalAiConfigKey,
+)
 
 DEFAULT_EXTRA_ATTRIBUTES_TO_EXPOSE = [
     "rgb_color",
@@ -163,6 +173,20 @@ def get_exposed_entities(hass: HomeAssistant) -> dict[str, dict[str, object]]:
         entity_states[state.entity_id] = attributes
 
     return entity_states
+
+
+def resolve_prompt(options: Mapping[str, object]) -> str:
+    """Return the system prompt for an agent.
+
+    A prompt the user wrote themselves always wins. If the field is empty, or still
+    holds Home Assistant's stock "voice assistant" prompt from an older setup, the
+    built-in prompt for the agent's conversation mode is used instead.
+    """
+    custom = str(options.get(CONF_PROMPT) or "").strip()
+    if custom and custom != llm.DEFAULT_INSTRUCTIONS_PROMPT.strip():
+        return custom
+    mode = options.get(PersonalAiConfigKey.CONVERSATION_MODE, DEFAULT_CONVERSATION_MODE)
+    return MODE_PROMPTS.get(str(mode), MODE_PROMPTS[DEFAULT_CONVERSATION_MODE])
 
 
 def format_custom_prompt(
