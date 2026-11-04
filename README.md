@@ -18,6 +18,8 @@ Gemini-FastAPI, and so on.
 - **Google web search**: the AI searches Google (and can open the pages) when it needs current information, such as news, scores, prices, opening hours.
 - **AI Task (data)** for `ai_task.generate_data`, including structured output and image attachments.
 - **AI Image generator** for `ai_task.generate_image`, using the standard `/v1/images` endpoints. Pick the size, quality, and format, **choose the folder images are saved to**, and name files with a template.
+- **AI voice (text-to-speech) entity** with **emotion**: `[happy]`, `[whisper]`, `[sad]`... tags change the delivery mid-message. Works with OpenAI (`gpt-4o-mini-tts`) or the **Personal AI Speech add-on** on your Pi.
+- **AI transcription (speech-to-text) entity** for Assist, via any OpenAI-compatible `/audio/transcriptions` server (Whisper in the add-on, OpenAI, etc.).
 - **TTS-friendly output**: strips emojis, Markdown emphasis, and LaTeX so announcements sound clean.
 - **Real logo and icon** (Home Assistant 2026.3+ reads them from the `brand/` folder).
 
@@ -49,6 +51,26 @@ Each conversation agent has a **Conversation mode**:
 | **Plain chat** | A normal AI chatbot with no access to your entities or devices. |
 
 If the **System Prompt** is left empty (or still holds the old stock Assist prompt), a built-in prompt for the chosen mode is used. Write your own prompt to override it. For Hybrid and Home control, **Tool Providers** still decides which Home Assistant tools (normally *Assist*) the agent may use.
+
+## Voice: emotion TTS and STT
+
+Add a second Personal AI server pointing at the **Personal AI Speech add-on** (`http://local-personal-ai-speech:8880/v1`, or `http://<pi-ip>:8880/v1`), then on that entry click **Add AI voice (TTS)** and **Add AI transcription (STT)**. Pick them in *Settings, Voice assistants*.
+
+**Emotion:** write tags in the text, or turn on *Speak with emotion* on a conversation agent so the AI adds them itself.
+
+```yaml
+action: tts.speak
+target:
+  entity_id: tts.kokoro_82m_ai_voice
+data:
+  media_player_entity_id: media_player.kitchen
+  message: "[excited] You got a package! [whisper] Don't tell anyone it's a gift."
+  options:
+    voice: af_heart
+    emotion: calm   # used where there is no tag
+```
+
+Tags: neutral, happy, cheerful, excited, sad, angry, calm, gentle, whisper, shout, sarcastic, serious, nervous, curious, surprised, tired, playful, confident, empathetic, laughing. With OpenAI's `gpt-4o-mini-tts` each tag becomes a real acting instruction. With the local add-on the emotion is approximated (speed, volume, pauses), so it sounds natural but subtler.
 
 ## Web search
 
