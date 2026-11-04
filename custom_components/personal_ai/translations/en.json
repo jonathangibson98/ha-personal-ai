@@ -39,7 +39,8 @@
             "search_api_key": "Search API key",
             "search_engine_id": "Search engine ID (Google CSE only)",
             "search_max_results": "Results per search",
-            "read_webpages": "Allow opening web pages"
+            "read_webpages": "Allow opening web pages",
+            "emotion_tags": "Speak with emotion (add emotion tags)"
           },
           "data_description": {
             "model": "The model to use for the conversation agent",
@@ -51,7 +52,8 @@
             "search_api_key": "The API key from your search provider.",
             "search_engine_id": "The 'cx' value of your Programmable Search Engine. Not used by Serper.",
             "search_max_results": "How many results the AI sees per search.",
-            "read_webpages": "Lets the AI open a search result to read the full page. Local and private addresses are always blocked."
+            "read_webpages": "Lets the AI open a search result to read the full page. Local and private addresses are always blocked.",
+            "emotion_tags": "Makes the AI start sentences with tags like [happy] or [whisper] that the AI voice acts out. The tags show in text chat, so turn this on for voice-only agents."
           }
         },
         "reconfigure": {
@@ -72,7 +74,8 @@
             "search_api_key": "Search API key",
             "search_engine_id": "Search engine ID (Google CSE only)",
             "search_max_results": "Results per search",
-            "read_webpages": "Allow opening web pages"
+            "read_webpages": "Allow opening web pages",
+            "emotion_tags": "Speak with emotion (add emotion tags)"
           },
           "data_description": {
             "model": "The model to use for the conversation agent",
@@ -84,7 +87,8 @@
             "search_api_key": "The API key from your search provider.",
             "search_engine_id": "The 'cx' value of your Programmable Search Engine. Not used by Serper.",
             "search_max_results": "How many results the AI sees per search.",
-            "read_webpages": "Lets the AI open a search result to read the full page. Local and private addresses are always blocked."
+            "read_webpages": "Lets the AI open a search result to read the full page. Local and private addresses are always blocked.",
+            "emotion_tags": "Makes the AI start sentences with tags like [happy] or [whisper] that the AI voice acts out. The tags show in text chat, so turn this on for voice-only agents."
           }
         }
       },
@@ -211,6 +215,96 @@
         "cannot_connect": "Could not communicate with the server",
         "unknown": "An unknown error occurred",
         "reconfigure_successful": "AI Image generator has been reconfigured"
+      }
+    },
+    "ai_tts": {
+      "step": {
+        "user": {
+          "title": "Configure the new AI voice",
+          "data": {
+            "model": "Voice model",
+            "tts_voice": "Voice",
+            "tts_speed": "Speed",
+            "tts_emotion": "Default emotion",
+            "tts_instructions": "Style instructions",
+            "tts_format": "Audio format"
+          },
+          "data_description": {
+            "model": "The speech model on your server (kokoro-82m for the Personal AI Speech add-on, gpt-4o-mini-tts for OpenAI)",
+            "tts_voice": "Pick one, or type your own. With the add-on you can blend voices, e.g. af_heart+af_bella.",
+            "tts_speed": "1.0 is normal speed.",
+            "tts_emotion": "Used when the text has no [emotion] tag. Tags in the text always win.",
+            "tts_instructions": "Optional, e.g. 'Speak like a laid-back friend'. Sent to models that follow instructions (OpenAI gpt-4o-mini-tts); the add-on only picks up emotion words from it.",
+            "tts_format": "mp3 works everywhere. Messages with several emotions are always returned as wav."
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure the AI voice",
+          "data": {
+            "model": "Voice model",
+            "tts_voice": "Voice",
+            "tts_speed": "Speed",
+            "tts_emotion": "Default emotion",
+            "tts_instructions": "Style instructions",
+            "tts_format": "Audio format"
+          },
+          "data_description": {
+            "model": "The speech model on your server (kokoro-82m for the Personal AI Speech add-on, gpt-4o-mini-tts for OpenAI)",
+            "tts_voice": "Pick one, or type your own. With the add-on you can blend voices, e.g. af_heart+af_bella.",
+            "tts_speed": "1.0 is normal speed.",
+            "tts_emotion": "Used when the text has no [emotion] tag. Tags in the text always win.",
+            "tts_instructions": "Optional, e.g. 'Speak like a laid-back friend'. Sent to models that follow instructions (OpenAI gpt-4o-mini-tts); the add-on only picks up emotion words from it.",
+            "tts_format": "mp3 works everywhere. Messages with several emotions are always returned as wav."
+          }
+        }
+      },
+      "initiate_flow": {
+        "user": "Add AI voice (TTS)"
+      },
+      "entry_type": "AI voice (text-to-speech)",
+      "abort": {
+        "cannot_connect": "Could not communicate with the server",
+        "unknown": "An unknown error occurred",
+        "reconfigure_successful": "AI voice (text-to-speech) has been reconfigured"
+      }
+    },
+    "ai_stt": {
+      "step": {
+        "user": {
+          "title": "Configure the new AI transcription",
+          "data": {
+            "model": "Transcription model",
+            "stt_language": "Language",
+            "stt_prompt": "Hint prompt"
+          },
+          "data_description": {
+            "model": "The transcription model on your server (e.g. whisper-base.en for the add-on)",
+            "stt_language": "Optional two-letter code like en. Leave blank to use the voice pipeline's language.",
+            "stt_prompt": "Optional words to help it spell names right, e.g. 'kitchen, living room, MJ'."
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure the AI transcription",
+          "data": {
+            "model": "Transcription model",
+            "stt_language": "Language",
+            "stt_prompt": "Hint prompt"
+          },
+          "data_description": {
+            "model": "The transcription model on your server (e.g. whisper-base.en for the add-on)",
+            "stt_language": "Optional two-letter code like en. Leave blank to use the voice pipeline's language.",
+            "stt_prompt": "Optional words to help it spell names right, e.g. 'kitchen, living room, MJ'."
+          }
+        }
+      },
+      "initiate_flow": {
+        "user": "Add AI transcription (STT)"
+      },
+      "entry_type": "AI transcription (speech-to-text)",
+      "abort": {
+        "cannot_connect": "Could not communicate with the server",
+        "unknown": "An unknown error occurred",
+        "reconfigure_successful": "AI transcription (speech-to-text) has been reconfigured"
       }
     }
   },
