@@ -32,6 +32,7 @@ from homeassistant.helpers import llm
 
 from .const import (
     DEFAULT_CONVERSATION_MODE,
+    EMOTION_LINE,
     LOGGER,
     MODE_PROMPTS,
     PersonalAiConfigKey,
@@ -184,9 +185,13 @@ def resolve_prompt(options: Mapping[str, object]) -> str:
     """
     custom = str(options.get(CONF_PROMPT) or "").strip()
     if custom and custom != llm.DEFAULT_INSTRUCTIONS_PROMPT.strip():
-        return custom
-    mode = options.get(PersonalAiConfigKey.CONVERSATION_MODE, DEFAULT_CONVERSATION_MODE)
-    return MODE_PROMPTS.get(str(mode), MODE_PROMPTS[DEFAULT_CONVERSATION_MODE])
+        prompt = custom
+    else:
+        mode = options.get(PersonalAiConfigKey.CONVERSATION_MODE, DEFAULT_CONVERSATION_MODE)
+        prompt = MODE_PROMPTS.get(str(mode), MODE_PROMPTS[DEFAULT_CONVERSATION_MODE])
+    if options.get(PersonalAiConfigKey.EMOTION_TAGS):
+        prompt = f"{prompt}\n{EMOTION_LINE}"
+    return prompt
 
 
 def format_custom_prompt(

@@ -11,7 +11,7 @@ from openai import AsyncOpenAI, AuthenticationError, OpenAIError
 
 from .const import LOGGER, TIMEOUT, PersonalAiConfigKey
 
-PLATFORMS = [Platform.AI_TASK, Platform.CONVERSATION]
+PLATFORMS = [Platform.AI_TASK, Platform.CONVERSATION, Platform.STT, Platform.TTS]
 
 type PersonalAiConfigEntry = ConfigEntry[AsyncOpenAI]
 

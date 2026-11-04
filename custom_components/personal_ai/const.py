@@ -16,6 +16,7 @@ class PersonalAiConfigKey:
 
     BASE_URL = "base_url"
     CONVERSATION_MODE = "conversation_mode"
+    EMOTION_TAGS = "emotion_tags"
     GENERATE_DATA = "generate_data"
     FILENAME_TEMPLATE = "filename_template"
     GENERATE_IMAGE = "generate_image"
@@ -34,11 +35,18 @@ class PersonalAiConfigKey:
     SEARCH_MAX_RESULTS = "search_max_results"
     SEARCH_PROVIDER = "search_provider"
     SERVER_NAME = "server_name"
+    STT_LANGUAGE = "stt_language"
+    STT_PROMPT = "stt_prompt"
     STRIP_EMOJIS = "strip_emojis"
     STRIP_EMPHASIS = "strip_emphasis"
     STRIP_LATEX = "strip_latex"
     SUPPORT_ATTACHMENTS = "support_attachments"
     TEMPERATURE = "temperature"
+    TTS_EMOTION = "tts_emotion"
+    TTS_FORMAT = "tts_format"
+    TTS_INSTRUCTIONS = "tts_instructions"
+    TTS_SPEED = "tts_speed"
+    TTS_VOICE = "tts_voice"
     WEB_SEARCH = "web_search"
 
 
@@ -46,7 +54,9 @@ class PersonalAiSubentryType(StrEnum):
     """Subentry types supported by Personal AI."""
 
     AI_IMAGE = "ai_image"
+    AI_STT = "ai_stt"
     AI_TASK_DATA = "ai_task_data"
+    AI_TTS = "ai_tts"
     CONVERSATION = "conversation"
 
 
@@ -67,6 +77,15 @@ DATE_LINE = "Current date and time: {{ now().strftime('%A %d %B %Y, %H:%M') }}."
 VOICE_LINE = (
     "Your replies may be read aloud, so keep them short and conversational, with no "
     "Markdown, emojis, bullet lists or web addresses unless the user asks for detail."
+)
+
+EMOTION_LINE = (
+    "Your replies are spoken aloud by an expressive voice. Begin each sentence, or whenever the "
+    "feeling changes, with one emotion tag in square brackets, chosen only from: [neutral] "
+    "[happy] [cheerful] [excited] [sad] [angry] [calm] [gentle] [whisper] [shout] [sarcastic] "
+    "[serious] [nervous] [curious] [surprised] [tired] [playful] [confident] [empathetic] "
+    "[laughing]. Use [neutral] for plain facts. Never mention or explain the tags and never use "
+    "any other text in square brackets."
 )
 
 MODE_PROMPTS = {
@@ -115,6 +134,32 @@ IMAGE_FORMAT_OPTIONS = ("png", "jpeg", "webp")
 IMAGE_RESPONSE_FORMAT_OPTIONS = ("b64_json", "url", "omit")
 
 EVENT_IMAGE_SAVED = f"{DOMAIN}_image_saved"
+
+# --- Speech (text-to-speech / speech-to-text) -------------------------------
+DEFAULT_TTS_VOICE = "alloy"
+DEFAULT_TTS_FORMAT = "mp3"
+DEFAULT_TTS_SPEED = 1.0
+DEFAULT_TTS_EMOTION = "neutral"
+TTS_FORMAT_OPTIONS = ("mp3", "wav", "opus", "flac", "aac")
+# Voices OpenAI offers; used when the server can't list its own at /audio/voices.
+FALLBACK_TTS_VOICES = (
+    "alloy",
+    "ash",
+    "ballad",
+    "coral",
+    "echo",
+    "fable",
+    "nova",
+    "onyx",
+    "sage",
+    "shimmer",
+    "verse",
+)
+TTS_TIMEOUT = 120.0  # a Raspberry Pi can take a while on long replies
+STT_TIMEOUT = 60.0
+TTS_ATTR_SPEED = "speed"
+TTS_ATTR_INSTRUCTIONS = "instructions"
+TTS_ATTR_EMOTION = "emotion"
 
 MAX_TOOL_ITERATIONS = 10
 TIMEOUT = 10.0

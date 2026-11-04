@@ -54,21 +54,28 @@ from .const import (
     DEFAULT_IMAGE_SIZE,
     DEFAULT_SEARCH_PROVIDER,
     DEFAULT_SEARCH_RESULTS,
+    DEFAULT_TTS_EMOTION,
+    DEFAULT_TTS_FORMAT,
+    DEFAULT_TTS_SPEED,
+    DEFAULT_TTS_VOICE,
     DOMAIN,
     IMAGE_FORMAT_OPTIONS,
     IMAGE_QUALITY_OPTIONS,
     IMAGE_RESPONSE_FORMAT_OPTIONS,
+    FALLBACK_TTS_VOICES,
     IMAGE_SIZE_OPTIONS,
     LOGGER,
     RECOMMENDED_CONVERSATION_OPTIONS,
     SEARCH_PROVIDER_GOOGLE_CSE,
     SEARCH_PROVIDERS,
     TIMEOUT,
+    TTS_FORMAT_OPTIONS,
     WEB_SEARCH_API_PREFIX,
     PersonalAiConfigKey,
     PersonalAiSubentryType,
 )
 from .image_storage import default_save_path, is_path_allowed
+from .speech import EMOTION_NAMES, async_fetch_voices
 
 
 class PersonalAiConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -86,6 +93,8 @@ class PersonalAiConfigFlow(ConfigFlow, domain=DOMAIN):
             PersonalAiSubentryType.CONVERSATION: ConversationFlowHandler,
             PersonalAiSubentryType.AI_TASK_DATA: AITaskDataFlowHandler,
             PersonalAiSubentryType.AI_IMAGE: AIImageFlowHandler,
+            PersonalAiSubentryType.AI_TTS: AITTSFlowHandler,
+            PersonalAiSubentryType.AI_STT: AISTTFlowHandler,
         }
 
     async def async_step_user(
@@ -128,7 +137,9 @@ class PersonalAiConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(PersonalAiConfigKey.SERVER_NAME, default="Personal AI Server"): str,
+                    vol.Required(
+                        PersonalAiConfigKey.SERVER_NAME, default="Personal AI Server"
+                    ): str,
                     vol.Required(
                         PersonalAiConfigKey.BASE_URL, default="https://api.openai.com/v1"
                     ): str,
@@ -296,6 +307,10 @@ class ConversationFlowHandler(PersonalAiSubentryFlowHandler):
                 vol.Optional(
                     PersonalAiConfigKey.STRIP_LATEX,
                     default=options.get(PersonalAiConfigKey.STRIP_LATEX, True),
+                ): bool,
+                vol.Optional(
+                    PersonalAiConfigKey.EMOTION_TAGS,
+                    default=options.get(PersonalAiConfigKey.EMOTION_TAGS, False),
                 ): bool,
                 vol.Optional(
                     PersonalAiConfigKey.MANUAL_PROMPTING,
@@ -595,7 +610,9 @@ class AIImageFlowHandler(PersonalAiSubentryFlowHandler):
                 ): bool,
                 vol.Optional(
                     PersonalAiConfigKey.SAVE_PATH,
-                    default=options.get(PersonalAiConfigKey.SAVE_PATH, default_save_path(self.hass)),
+                    default=options.get(
+                        PersonalAiConfigKey.SAVE_PATH, default_save_path(self.hass)
+                    ),
                 ): str,
                 vol.Optional(
                     PersonalAiConfigKey.FILENAME_TEMPLATE,
@@ -669,4 +686,176 @@ class AIImageFlowHandler(PersonalAiSubentryFlowHandler):
         options = self._get_reconfigure_subentry().data.copy()
         return self.async_show_form(
             step_id="reconfigure", data_schema=await self.get_schema(options)
+        )
+
+
+class SpeechFlowBase(PersonalAiSubentryFlowHandler):
+    """Shared plumbing for the text-to-speech and speech-to-text subentry flows."""
+
+    title_suffix = "AI Speech"
+
+    async def _async_models(self) -> list[SelectOptionDict]:
+        """List the models the server offers (empty if it can't say)."""
+        try:
+            client = self._get_entry().runtime_data
+            response = await client.with_options(timeout=TIMEOUT).models.list()
+            return [SelectOptionDict(label=model.id, value=model.id) for model in response.data]
+        except OpenAIError as err:
+            LOGGER.warning("Could not list models: %s", err)
+        except Exception as err:
+            LOGGER.warning("Unexpected error listing models: %s", err)
+        return []
+
+    def _default_model(self, options: dict[str, object], models: list[SelectOptionDict]) -> str:
+        """Pick the model to preselect."""
+        if raw_model := options.get(CONF_MODEL):
+            return str(raw_model)
+        return models[0]["value"] if models else "Local"
+
+    async def get_schema(self, options: dict[str, object] | None = None):
+        """Return the form for this flow."""
+        raise NotImplementedError
+
+    @staticmethod
+    def _clean(user_input: dict[str, object]) -> tuple[dict[str, object], str | None]:
+        """Tidy the submitted form and return (data, custom_name)."""
+        data = user_input.copy()
+        raw_name = data.get(CONF_NAME)
+        custom_name = raw_name.strip() if isinstance(raw_name, str) else None
+        if custom_name:
+            data[CONF_NAME] = custom_name
+        else:
+            data.pop(CONF_NAME, None)
+        return data, custom_name
+
+    def _title(self, data: dict[str, object], custom_name: str | None) -> str:
+        raw_model = data.get(CONF_MODEL, "Local")
+        model_name = self.strip_model_pathing(str(raw_model) if raw_model is not None else "Local")
+        return custom_name or f"{model_name} {self.title_suffix}"
+
+    async def async_step_user(
+        self, user_input: dict[str, object] | None = None
+    ) -> SubentryFlowResult:
+        """Handle the user step to create the subentry."""
+        if user_input is None:
+            return self.async_show_form(step_id="user", data_schema=await self.get_schema())
+        data, custom_name = self._clean(user_input)
+        return self.async_create_entry(title=self._title(data, custom_name), data=data)
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, object] | None = None
+    ) -> SubentryFlowResult:
+        """Handle the reconfigure step."""
+        if user_input is not None:
+            data, custom_name = self._clean(user_input)
+            return self.async_update_and_abort(
+                self._get_entry(),
+                self._get_reconfigure_subentry(),
+                title=self._title(data, custom_name),
+                data=data,
+            )
+        options = self._get_reconfigure_subentry().data.copy()
+        return self.async_show_form(
+            step_id="reconfigure", data_schema=await self.get_schema(options)
+        )
+
+
+class AITTSFlowHandler(SpeechFlowBase):
+    """Subentry flow for an AI voice (text-to-speech) entity."""
+
+    title_suffix = "AI Voice"
+
+    async def get_schema(self, options: dict[str, object] | None = None):
+        """Return the configuration schema for the voice."""
+        options = options or {}
+        models = await self._async_models()
+        default_model = self._default_model(options, models)
+
+        entry = self._get_entry()
+        voices = await async_fetch_voices(
+            get_async_client(self.hass),
+            str(entry.data[PersonalAiConfigKey.BASE_URL]),
+            entry.data.get(CONF_API_KEY),
+        )
+        voice_options = voices or list(FALLBACK_TTS_VOICES)
+        default_voice = str(options.get(PersonalAiConfigKey.TTS_VOICE) or "")
+        if not default_voice:
+            default_voice = voices[0] if voices else DEFAULT_TTS_VOICE
+
+        return vol.Schema(
+            {
+                vol.Optional(
+                    CONF_NAME,
+                    default=str(
+                        options.get(CONF_NAME)
+                        or f"{self.strip_model_pathing(default_model)} {self.title_suffix}"
+                    ),
+                ): str,
+                vol.Required(CONF_MODEL, default=default_model): SelectSelector(
+                    SelectSelectorConfig(options=models, custom_value=True)
+                ),
+                vol.Optional(PersonalAiConfigKey.TTS_VOICE, default=default_voice): _select(
+                    tuple(voice_options), custom=True
+                ),
+                vol.Optional(
+                    PersonalAiConfigKey.TTS_SPEED,
+                    default=options.get(PersonalAiConfigKey.TTS_SPEED, DEFAULT_TTS_SPEED),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=0.5, max=2.0, step=0.05, mode=NumberSelectorMode.SLIDER
+                    )
+                ),
+                vol.Optional(
+                    PersonalAiConfigKey.TTS_EMOTION,
+                    default=options.get(PersonalAiConfigKey.TTS_EMOTION, DEFAULT_TTS_EMOTION),
+                ): _select(EMOTION_NAMES),
+                vol.Optional(
+                    PersonalAiConfigKey.TTS_INSTRUCTIONS,
+                    description={
+                        "suggested_value": options.get(PersonalAiConfigKey.TTS_INSTRUCTIONS) or ""
+                    },
+                ): TextSelector(TextSelectorConfig(multiline=True)),
+                vol.Optional(
+                    PersonalAiConfigKey.TTS_FORMAT,
+                    default=options.get(PersonalAiConfigKey.TTS_FORMAT, DEFAULT_TTS_FORMAT),
+                ): _select(TTS_FORMAT_OPTIONS),
+            }
+        )
+
+
+class AISTTFlowHandler(SpeechFlowBase):
+    """Subentry flow for an AI transcription (speech-to-text) entity."""
+
+    title_suffix = "AI Transcription"
+
+    async def get_schema(self, options: dict[str, object] | None = None):
+        """Return the configuration schema for transcription."""
+        options = options or {}
+        models = await self._async_models()
+        default_model = self._default_model(options, models)
+        return vol.Schema(
+            {
+                vol.Optional(
+                    CONF_NAME,
+                    default=str(
+                        options.get(CONF_NAME)
+                        or f"{self.strip_model_pathing(default_model)} {self.title_suffix}"
+                    ),
+                ): str,
+                vol.Required(CONF_MODEL, default=default_model): SelectSelector(
+                    SelectSelectorConfig(options=models, custom_value=True)
+                ),
+                vol.Optional(
+                    PersonalAiConfigKey.STT_LANGUAGE,
+                    description={
+                        "suggested_value": options.get(PersonalAiConfigKey.STT_LANGUAGE) or ""
+                    },
+                ): str,
+                vol.Optional(
+                    PersonalAiConfigKey.STT_PROMPT,
+                    description={
+                        "suggested_value": options.get(PersonalAiConfigKey.STT_PROMPT) or ""
+                    },
+                ): TextSelector(TextSelectorConfig(multiline=True)),
+            }
         )
