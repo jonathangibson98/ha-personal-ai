@@ -325,5 +325,39 @@
         "google_cse": "Google Custom Search (legacy)"
       }
     }
+  },
+  "services": {
+    "search_models": {
+      "name": "Search models",
+      "description": "Searches the Ollama library and Hugging Face through a Personal AI Gateway and returns the matches.",
+      "fields": {
+        "query": {
+          "name": "Search",
+          "description": "Words to search for, for example llama or qwen coder."
+        },
+        "source": {
+          "name": "Source",
+          "description": "Where to search."
+        },
+        "config_entry": {
+          "name": "Server",
+          "description": "Which Personal AI server (a Personal AI Gateway). Optional if you have only one."
+        }
+      }
+    },
+    "pull_model": {
+      "name": "Download model",
+      "description": "Tells a Personal AI Gateway to download a model into its Ollama.",
+      "fields": {
+        "model": {
+          "name": "Model",
+          "description": "Exact name, for example llama3.1:8b or hf.co/user/repo:Q4_K_M."
+        },
+        "config_entry": {
+          "name": "Server",
+          "description": "Which Personal AI server (a Personal AI Gateway). Optional if you have only one."
+        }
+      }
+    }
   }
 }
