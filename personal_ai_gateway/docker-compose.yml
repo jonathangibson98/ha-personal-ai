@@ -1,0 +1,48 @@
+# Personal AI Gateway, standalone.
+#   1. cp .env.example .env     (add your keys; set a PROXY_API_KEY)
+#   2. docker compose up -d --build
+#      Want Ollama bundled too?  docker compose --profile bundled up -d --build
+#      (and set OLLAMA_URL=http://ollama:11434 in .env)
+#   3. open http://<this-machine>:8000 and sign in with the proxy key
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.standalone
+    # Prebuilt by GitHub Actions on every push: `docker compose pull && docker compose up -d`
+    # Building locally instead: `docker compose up -d --build`
+    image: ghcr.io/jonathangibson98/personal-ai-gateway:latest
+    container_name: personal_ai_gateway
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      # Default points at an Ollama already running on this machine (any network mode).
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data:/data   # providers, keys you add in the page, usage counters
+
+  # Optional: run Ollama itself as part of this stack (docker compose --profile bundled ...)
+  ollama:
+    profiles: ["bundled"]
+    image: ollama/ollama:latest
+    container_name: gateway_ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # NVIDIA GPU (needs the NVIDIA container toolkit): uncomment
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+volumes:
+  ollama_data:
