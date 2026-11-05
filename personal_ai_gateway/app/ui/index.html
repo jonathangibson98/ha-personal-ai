@@ -422,6 +422,8 @@ label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
       h('div', { class: 'card' }, h('h3', {}, 'Key rotation'),
         ...field('Default mode', rot), ...field('Rest times after repeated failures (seconds, in order)', cool), ...field('Wait for a provider (seconds)', to)),
       h('div', { class: 'card' }, h('h3', {}, 'Local models (Ollama)'),
+        S.bundled ? h('p', { class: 'muted' }, 'Ollama is built into this add-on and runs on this machine’s CPU. Use 127.0.0.1:11434 below, or any other Ollama you have.') : null,
+        S.bundled ? h('button', { class: 'b', type: 'button', onclick: () => { ou.value = 'http://127.0.0.1:11434'; toast('Press Save settings to apply'); } }, 'Use the built-in Ollama') : null,
         ...field(locked('ollama_url') ? 'Ollama address (set by the OLLAMA_URL environment variable)' : 'Ollama address (LAN address of the machine running Ollama)', ou),
         h('button', { class: 'b', type: 'button', onclick: act(async () => { const r = await api('ollama/test', { method: 'POST', json: { url: ou.value } }); r.ok ? toast('Connected: Ollama ' + r.version) : toast(r.error, true); }) }, 'Test connection'),
         ...field(locked('ollama_preload') ? 'Download on start (set by the OLLAMA_PRELOAD environment variable)' : 'Download on start (comma-separated names)', pre)),
