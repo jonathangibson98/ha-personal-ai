@@ -127,6 +127,16 @@ homeassistant:
     - /mnt/nas/ai_images
 ```
 
+## Personal AI Gateway (self-hosted AI + key rotation)
+
+The `personal_ai_gateway/` folder is a companion server (Docker Compose or Home Assistant add-on) that gives this integration one OpenAI-compatible address for all your providers:
+
+- several API keys per provider with **rotation, cooldowns and failover**, plus **fallback routes** (try Gemini, then Groq, then local),
+- **host the AI yourself**: manage Ollama, **search the Ollama library and Hugging Face**, download models with a progress meter,
+- custom HTTP providers for services with their own endpoint, and a phone-friendly management page.
+
+Point a Personal AI server at `http://<host>:8000/v1` with the gateway's proxy key. New actions `personal_ai.search_models` and `personal_ai.pull_model` search and download models from Home Assistant. See `personal_ai_gateway/DOCS.md`.
+
 ## Troubleshooting
 
 - **Logo missing:** needs HA 2026.3+. Restart Home Assistant and hard-refresh the browser, since brand images are cached.
