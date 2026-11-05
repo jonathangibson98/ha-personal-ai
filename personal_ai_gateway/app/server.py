@@ -21,7 +21,9 @@ from rotator import KeyPool, kid
 from store import DATA_DIR, PRESETS, Store
 from upstream import Gateway, err, sanitize
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
+TEST_MODELS = {"gemini": "gemini-2.5-flash", "openai": "gpt-4o-mini", "groq": "llama-3.3-70b-versatile",
+               "mistral": "mistral-small-latest", "deepseek": "deepseek-chat", "cerebras": "llama3.1-8b"}
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("gateway")
 APP_DIR = Path(__file__).parent
@@ -150,7 +152,7 @@ async def api_state(request):
         "presets": {k: v for k, v in PRESETS.items()}, "recent": list(GW.recent)[:30],
         "ollama": await HUB.status(), "addon": bool(INGRESS_IP),
         "env_locked": [k for k, e in (("ollama_url", "OLLAMA_URL"), ("ollama_preload", "OLLAMA_PRELOAD"))
-                       if os.environ.get(e) or STORE.options.get(k)],
+                       if os.environ.get(e, "").strip()],
     })
 
 
@@ -196,7 +198,8 @@ async def api_key_reset(request):
 
 async def api_provider_models(request):
     name = request.match_info["name"]
-    return web.json_response({"models": await GW.list_models(name, force=True)})
+    models = await GW.list_models(name, force=True)
+    return web.json_response({"models": models, "error": GW.list_errors.get(name, "")})
 
 
 async def api_provider_test(request):
@@ -205,12 +208,13 @@ async def api_provider_test(request):
     prov = STORE.providers().get(name)
     if not prov:
         raise ValueError("Unknown provider.")
-    model = str(b.get("model") or "")
+    model = str(b.get("model") or "").strip()
     if not model:
         models = await GW.list_models(name, force=True)
-        if not models:
-            return web.json_response({"ok": False, "error": "No models listed. Check the URL and key, or type a model name."})
-        model = models[0]
+        model = models[0] if models else TEST_MODELS.get(name, "")
+        if not model:
+            return web.json_response({"ok": False, "error": "Couldn't list models: " + (GW.list_errors.get(name) or "none returned")
+                                      + ". Type a model name in the box next to Test."})
     body = {"model": f"{name}/{model}", "max_tokens": 30,
             "messages": [{"role": "user", "content": "Reply with the single word: ok"}]}
     t0 = time.time()
@@ -222,6 +226,13 @@ async def api_provider_test(request):
         reply = ((raw.get("choices") or [{}])[0].get("message") or {}).get("content", "")
         return web.json_response({"ok": True, "model": model, "reply": str(reply)[:200], "ms": ms})
     return web.json_response({"ok": False, "model": model, "error": (raw.get("error") or {}).get("message", str(raw))[:400], "ms": ms})
+
+
+async def api_ollama_test(request):
+    url = str((await request.json()).get("url") or "").strip()
+    if url and not url.startswith(("http://", "https://")):
+        raise ValueError("The address must start with http:// or https://")
+    return web.json_response(await HUB.status(url or None))
 
 
 async def api_routes(request):
@@ -253,7 +264,7 @@ async def api_installed(request):
 
 async def api_pull(request):
     b = await request.json()
-    return web.json_response(HUB.start_pull(str(b.get("name", ""))))
+    return web.json_response(await HUB.start_pull(str(b.get("name", ""))))
 
 
 async def api_model_delete(request):
@@ -338,6 +349,7 @@ async def make_app() -> web.Application:
         web.post("/api/providers/{name}/keys/{kid}/reset", api_key_reset),
         web.get("/api/providers/{name}/models", api_provider_models),
         web.post("/api/providers/{name}/test", api_provider_test),
+        web.post("/api/ollama/test", api_ollama_test),
         web.put("/api/routes", api_routes), web.put("/api/settings", api_settings),
         web.post("/api/proxy-key/regenerate", api_regen),
         web.get("/api/all-models", api_all_models),

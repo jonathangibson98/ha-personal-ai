@@ -2,6 +2,7 @@
 import asyncio
 import collections
 import json
+import logging
 import time
 import uuid
 
@@ -11,6 +12,7 @@ from rotator import KeyPool, kid
 from store import Store
 
 MODEL_CACHE_S = 300
+log = logging.getLogger("gateway")
 
 
 class UpstreamError(Exception):
@@ -116,6 +118,7 @@ class Gateway:
         self.store, self.pool, self.session = store, pool, session
         self._models: dict[str, tuple[float, list[str]]] = {}
         self.recent = collections.deque(maxlen=60)
+        self.list_errors: dict[str, str] = {}
 
     # -- model listing / resolving
     def _headers(self, key: str) -> dict:
@@ -129,22 +132,32 @@ class Gateway:
         if cached and not force and time.time() - cached[0] < MODEL_CACHE_S:
             return cached[1]
         ids: list[str] = []
+        last = ""
         if prov["kind"] == "http":
             ids = list(prov["recipe"].get("models") or [name])
         else:
             keys = self.store.keys(name) or ([""] if prov["kind"] == "ollama" else [])
+            if not keys:
+                last = "No API key added yet."
+            url = self.store.base_url(name) + "/models"
             for key in keys[:3]:
                 try:
-                    async with self.session.get(self.store.base_url(name) + "/models", headers=self._headers(key),
-                                                timeout=ClientTimeout(total=15)) as r:
+                    async with self.session.get(url, headers=self._headers(key), timeout=ClientTimeout(total=15)) as r:
                         if r.status == 200:
                             data = await r.json(content_type=None)
                             ids = [str(m.get("id", "")).removeprefix("models/") for m in data.get("data", [])]
+                            last = "" if ids else "The provider answered but listed no models."
                             break
-                except (ClientError, asyncio.TimeoutError, ValueError):
-                    continue
+                        last = f"HTTP {r.status} from {url}: {(await r.text())[:200]}"
+                except (ClientError, asyncio.TimeoutError, ValueError) as e:
+                    last = f"{type(e).__name__} reaching {url}: {e}"
+            if last:
+                log.warning("Listing models for %s failed: %s", name, last)
+        ids += [m for m in prov.get("models") or [] if m not in ids]  # models added by hand
         ids = sorted(m for m in ids if m and self.store.allowed(name, m))
-        self._models[name] = (time.time(), ids)
+        self.list_errors[name] = last
+        # Cache a good list for a while, but retry a failed one after 20 s.
+        self._models[name] = (time.time() if not last else time.time() - MODEL_CACHE_S + 20, ids)
         return ids
 
     async def all_models(self) -> list[dict]:

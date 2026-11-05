@@ -91,10 +91,15 @@ class Store:
         return self._opt("admin_password", "ADMIN_PASSWORD") or self.proxy_key
 
     def setting(self, key: str):
+        """Environment variable > value saved in the page > add-on option > default."""
         env = {"ollama_url": "OLLAMA_URL", "ollama_preload": "OLLAMA_PRELOAD"}.get(key)
-        if env and (v := self._opt(key, env)):
-            return v
-        return self.data["settings"].get(key, DEFAULT_SETTINGS[key])
+        if env and os.environ.get(env, "").strip():
+            return os.environ[env].strip()
+        if key in self.data["settings"]:
+            return self.data["settings"][key]
+        if key in ("ollama_url", "ollama_preload") and str(self.options.get(key) or "").strip():
+            return str(self.options[key]).strip()
+        return DEFAULT_SETTINGS[key]
 
     def settings(self) -> dict:
         return {k: self.setting(k) for k in DEFAULT_SETTINGS}
@@ -143,7 +148,8 @@ class Store:
         p = {"kind": kind, "enabled": spec.get("enabled", cur.get("enabled", True)),
              "mode": mode if mode in ("", "balanced", "sequential") else "",
              "keys": cur.get("keys", []), "ignore": spec.get("ignore", cur.get("ignore", [])),
-             "whitelist": spec.get("whitelist", cur.get("whitelist", []))}
+             "whitelist": spec.get("whitelist", cur.get("whitelist", [])),
+             "models": [str(m).strip() for m in spec.get("models", cur.get("models", [])) if str(m).strip()]}
         if kind == "openai":
             url = str(spec.get("base_url") or PRESETS.get(name, {}).get("base_url") or "").strip()
             if not url.startswith(("http://", "https://")):

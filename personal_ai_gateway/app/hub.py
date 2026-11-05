@@ -2,12 +2,18 @@
 import asyncio
 import html
 import json
+import logging
 import re
 import time
 import uuid
 
 from aiohttp import ClientError, ClientTimeout
 
+log = logging.getLogger("gateway")
+UNREACHABLE_HINT = (
+    "Use the LAN address of the machine that runs Ollama, for example http://192.168.1.50:11434 "
+    "(not localhost: inside this app that means the app itself). Ollama must listen on the network, "
+    "e.g. OLLAMA_HOST=0.0.0.0, and port 11434 must be reachable.")
 UA = {"User-Agent": "Mozilla/5.0 (compatible; PersonalAI-Gateway/1.0)"}
 QUANT_RE = re.compile(r"(?<![A-Za-z0-9])((?:IQ|Q)\d(?:_[A-Z0-9]+)*|BF16|F16|F32)(?![A-Za-z0-9])", re.I)
 MODEL_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]{0,200}")
@@ -85,14 +91,17 @@ class Hub:
                     raise OllamaError(f"Ollama {r.status}: {text[:200]}")
                 return json.loads(text) if text else {}
         except (ClientError, asyncio.TimeoutError) as e:
-            raise OllamaError(f"Can't reach Ollama at {self.base} ({type(e).__name__}). Check the Ollama URL in Settings.") from e
+            raise OllamaError(f"Can't reach Ollama at {self.base} ({type(e).__name__}). {UNREACHABLE_HINT}") from e
 
-    async def status(self) -> dict:
+    async def status(self, url: str | None = None) -> dict:
+        base = (url or self.base).rstrip("/")
         try:
-            v = await self._json("GET", "/api/version", t=5)
-            return {"ok": True, "url": self.base, "version": v.get("version", "")}
-        except OllamaError as e:
-            return {"ok": False, "url": self.base, "error": str(e)}
+            async with self.session.get(base + "/api/version", timeout=ClientTimeout(total=6)) as r:
+                if r.status != 200:
+                    return {"ok": False, "url": base, "error": f"{base} answered HTTP {r.status}. Is that really Ollama?"}
+                return {"ok": True, "url": base, "version": (await r.json(content_type=None)).get("version", "")}
+        except (ClientError, asyncio.TimeoutError, ValueError) as e:
+            return {"ok": False, "url": base, "error": f"Can't reach Ollama at {base} ({type(e).__name__}). {UNREACHABLE_HINT}"}
 
     async def installed(self) -> list[dict]:
         data = await self._json("GET", "/api/tags")
@@ -111,8 +120,11 @@ class Hub:
         await self._json("POST", "/api/generate", json={"model": name, "keep_alive": 0}, t=60)
 
     # -- downloads
-    def start_pull(self, name: str) -> dict:
+    async def start_pull(self, name: str) -> dict:
         name = name.strip()
+        st = await self.status()
+        if not st["ok"]:
+            raise OllamaError(st["error"])
         if not MODEL_NAME_RE.fullmatch(name):
             raise ValueError("That doesn't look like a model name.")
         for j in self.jobs.values():
@@ -152,7 +164,11 @@ class Hub:
             job.update(status="cancelled", message="Cancelled", updated=time.time())
             raise
         except (OllamaError, ClientError, asyncio.TimeoutError, ValueError) as e:
-            job.update(status="error", message=str(e) or type(e).__name__, updated=time.time())
+            msg = str(e) or type(e).__name__
+            if isinstance(e, (ClientError, asyncio.TimeoutError)):
+                msg = f"Lost the connection to Ollama at {self.base} ({type(e).__name__}). {UNREACHABLE_HINT}"
+            log.warning("Download of %s failed: %s", job["name"], msg)
+            job.update(status="error", message=msg, updated=time.time())
 
     def cancel(self, job_id: str) -> bool:
         t = self._tasks.get(job_id)
@@ -175,7 +191,7 @@ class Hub:
         have = {m["name"] for m in await self.installed()}
         for name in wanted:
             if name not in have and f"{name}:latest" not in have:
-                self.start_pull(name)
+                await self.start_pull(name)
 
     # -- search
     async def search(self, q: str, source: str = "all") -> dict:
