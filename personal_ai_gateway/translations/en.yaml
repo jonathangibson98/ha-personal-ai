@@ -7,7 +7,7 @@ configuration:
     description: Optional password for the management API outside Home Assistant. Empty means the proxy key.
   ollama_url:
     name: Ollama address
-    description: Where Ollama runs, for example http://172.30.32.1:11434 for Ollama on the same machine as Home Assistant OS, or http://192.168.1.50:11434.
+    description: Optional starting value. LAN address of the machine running Ollama, for example http://192.168.1.50:11434 (not localhost). You can also set and test it on the gateway page, which takes priority.
   ollama_preload:
     name: Download on start
     description: Comma-separated Ollama model names to download automatically, for example llama3.1:8b,qwen3:4b.
