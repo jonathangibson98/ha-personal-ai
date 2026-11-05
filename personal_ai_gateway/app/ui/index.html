@@ -1,1 +1,434 @@
-y
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Personal AI Gateway</title>
+<style>
+:root{
+  --bg:#e3e0d6; --panel:#efece4; --ink:#1c2226; --muted:#66706f; --line:#c9c5b8; --accent:#27596f; --accent-ink:#fff;
+  --ready:#2e9e5b; --cooling:#d99a1e; --locked:#cf4a3a; --off:#9aa09c; --danger:#b8402f;
+  --sans:"Avenir Next","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#161a1c; --panel:#20262a; --ink:#e8e6df; --muted:#98a3a3; --line:#333b3f; --accent:#6bb3cf; --accent-ink:#0d1a20;
+        --ready:#4ccf85; --cooling:#f0b43c; --locked:#ff7766; --off:#5b6462; --danger:#ff8a78}
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--sans);display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:12px 16px 8px}
+h1{font-size:1.1rem;margin:0;font-weight:700;letter-spacing:.01em}
+header small{color:var(--muted)}
+main{flex:1;overflow-y:auto;padding:4px 16px 24px;max-width:760px;width:100%;margin:0 auto}
+nav{display:grid;grid-template-columns:repeat(6,1fr);background:var(--panel);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom)}
+nav button{background:none;border:0;padding:11px 2px 10px;font:inherit;font-size:.78rem;color:var(--muted);cursor:pointer;border-top:3px solid transparent}
+nav button[aria-current=page]{color:var(--ink);border-top-color:var(--accent);font-weight:650}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+h2{font-size:1rem;margin:18px 0 8px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:10px 0}
+.card h3{margin:0 0 6px;font-size:1rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.row.sp{justify-content:space-between}
+.grow{flex:1;min-width:0}
+.muted{color:var(--muted);font-size:.88rem}
+.mono{font-family:var(--mono);font-size:.84rem;overflow-wrap:anywhere}
+button.b,a.b{font:inherit;font-size:.9rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:9px;padding:6px 12px;cursor:pointer;text-decoration:none}
+button.b.p{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.b.d{color:var(--danger)}
+button.b:disabled{opacity:.5;cursor:default}
+input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;max-width:100%}
+input[type=text],input[type=password],input:not([type]),textarea,select{width:100%}
+textarea{min-height:84px;font-family:var(--mono);font-size:.9rem}
+label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
+.lamp{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--off);flex:none;box-shadow:0 0 0 2px var(--panel),0 0 0 3px var(--line)}
+.lamp.ready{background:var(--ready);box-shadow:0 0 0 2px var(--panel),0 0 8px 1px var(--ready)}
+.lamp.cooling{background:var(--cooling);box-shadow:0 0 0 2px var(--panel),0 0 8px 1px var(--cooling)}
+.lamp.locked{background:var(--locked);box-shadow:0 0 0 2px var(--panel),0 0 8px 1px var(--locked)}
+.chip{font-size:.78rem;border:1px solid var(--line);border-radius:6px;padding:1px 7px;color:var(--muted);white-space:nowrap}
+.sub{display:flex;gap:6px;margin:10px 0}
+.sub button{flex:1;font:inherit;font-size:.9rem;padding:7px;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:9px;cursor:pointer}
+.sub button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.meter{display:grid;grid-template-columns:repeat(20,1fr);gap:2px;height:14px;margin:8px 0 4px}
+.meter i{background:var(--line);border-radius:2px}
+.meter i.on{background:var(--ready)}
+.keyrow{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.keyrow:first-of-type{border-top:0}
+.note{padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--cooling) 20%,var(--panel));font-size:.9rem;margin:10px 0}
+.err{color:var(--danger)}
+.ok{color:var(--ready)}
+#chatlog{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.m{padding:9px 12px;border-radius:14px;white-space:pre-wrap;overflow-wrap:anywhere;max-width:92%}
+.m.u{align-self:flex-end;background:var(--accent);color:var(--accent-ink)}
+.m.a{align-self:flex-start;background:var(--panel);border:1px solid var(--line)}
+#toast{position:fixed;left:50%;bottom:calc(70px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:10px;font-size:.9rem;max-width:90vw;z-index:9}
+@media (prefers-reduced-motion:no-preference){.lamp.cooling{animation:pulse 2s ease-in-out infinite}@keyframes pulse{50%{opacity:.55}}}
+</style>
+</head>
+<body>
+<header><h1>Personal AI Gateway</h1><small id="ver"></small></header>
+<main id="main"></main>
+<nav id="nav"></nav>
+<div id="toast" hidden></div>
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const h = (t, a = {}, ...c) => {
+    const e = document.createElement(t);
+    for (const [k, v] of Object.entries(a)) {
+      if (k === 'class') e.className = v;
+      else if (k.startsWith('on')) e[k] = v;
+      else if (k === 'value') e.value = v;
+      else if (v !== false && v != null) e.setAttribute(k, v === true ? '' : v);
+    }
+    for (const x of c.flat(9)) if (x != null && x !== false) e.append(x.nodeType ? x : document.createTextNode(String(x)));
+    return e;
+  };
+  let S = null, tab = 'overview', timer = null, modelsTab = 'installed';
+  const chat = [];
+
+  async function api(path, opts = {}) {
+    const headers = { ...(opts.headers || {}) };
+    if (opts.json !== undefined) { headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(opts.json); }
+    const t = sessionStorage.getItem('gw-token');
+    if (t) headers['X-Admin-Token'] = t;
+    const r = await fetch('api/' + path, { ...opts, headers });
+    if (r.status === 401) {
+      const p = prompt('Admin password (the proxy key unless you set an admin password)');
+      if (!p) throw new Error('Password required');
+      sessionStorage.setItem('gw-token', p);
+      return api(path, opts);
+    }
+    if (opts.raw) return r;
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    return j;
+  }
+  function toast(msg, bad) {
+    const t = $('#toast'); t.textContent = msg; t.hidden = false; t.style.background = bad ? 'var(--danger)' : '';
+    clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 3500);
+  }
+  const act = fn => async ev => {
+    const b = ev?.currentTarget; if (b) b.disabled = true;
+    try { await fn(); } catch (e) { toast(e.message, true); } finally { if (b) b.disabled = false; }
+  };
+  const copy = async text => {
+    try { await navigator.clipboard.writeText(text); toast('Copied'); } catch (e) { prompt('Copy this:', text); }
+  };
+  const ago = t => { const s = Math.max(0, Date.now() / 1000 - t); return s < 90 ? Math.round(s) + 's' : s < 5400 ? Math.round(s / 60) + 'm' : Math.round(s / 3600) + 'h'; };
+  const mb = n => n > 1e9 ? (n / 1e9).toFixed(2) + ' GB' : (n / 1e6).toFixed(0) + ' MB';
+  const lamp = s => h('span', { class: 'lamp ' + s, title: s });
+  const field = (label, input) => [h('label', { class: 'f' }, label), input];
+
+  const TABS = [['overview', 'Overview'], ['providers', 'Providers'], ['models', 'Models'], ['routes', 'Routes'], ['chat', 'Chat'], ['settings', 'Settings']];
+  function drawNav() {
+    $('#nav').replaceChildren(...TABS.map(([id, label]) =>
+      h('button', { type: 'button', 'aria-current': id === tab ? 'page' : null, onclick: () => { tab = id; show(); } }, label)));
+  }
+
+  async function show() {
+    clearInterval(timer);
+    drawNav();
+    try { S = await api('state'); } catch (e) { return $('#main').replaceChildren(h('p', { class: 'err' }, e.message)); }
+    $('#ver').textContent = 'v' + S.version;
+    const root = h('div');
+    $('#main').replaceChildren(root);
+    await ({ overview, providers, models, routes, chatTab, settings }[tab])(root);
+  }
+  const refreshEvery = (ms, fn) => { clearInterval(timer); timer = setInterval(fn, ms); };
+
+  // ------------------------------------------------------------ overview
+  const serverUrl = () => S.addon ? 'http://local-personal-ai-gateway:8000/v1'
+    : `${location.protocol}//${location.hostname}:8000/v1`;
+
+  async function overview(root) {
+    const draw = async () => {
+      S = await api('state');
+      const keyShown = root.dataset.show === '1';
+      root.replaceChildren(
+        h('div', { class: 'card' },
+          h('h3', {}, 'Connect an app'),
+          h('p', { class: 'muted' }, 'Any OpenAI-compatible app (Home Assistant Personal AI, SillyTavern, Open WebUI…) can use this gateway:'),
+          h('div', { class: 'mono' }, 'Server URL  ', serverUrl()),
+          h('div', { class: 'mono' }, 'API key     ', keyShown ? S.proxy_key : '••••••••••••••••'),
+          h('p', { class: 'muted' }, 'Model: provider/model, for example ', h('span', { class: 'mono' }, 'ollama/llama3.1:8b'), ' or a route name.'),
+          h('div', { class: 'row' },
+            h('button', { class: 'b', type: 'button', onclick: () => copy(serverUrl()) }, 'Copy URL'),
+            h('button', { class: 'b', type: 'button', onclick: () => copy(S.proxy_key) }, 'Copy key'),
+            h('button', { class: 'b', type: 'button', onclick: () => { root.dataset.show = keyShown ? '0' : '1'; draw(); } }, keyShown ? 'Hide' : 'Show'))),
+        h('div', { class: 'card' },
+          h('h3', {}, lamp(S.ollama.ok ? 'ready' : 'locked'), 'Your own models (Ollama)'),
+          S.ollama.ok ? h('p', { class: 'muted' }, `Connected to ${S.ollama.url}, version ${S.ollama.version}.`)
+            : h('p', { class: 'err' }, S.ollama.error),
+          h('button', { class: 'b p', type: 'button', onclick: () => { tab = 'models'; modelsTab = 'find'; show(); } }, 'Find a model to download')),
+        h('h2', {}, 'Providers'),
+        ...Object.entries(S.providers).map(([name, p]) => h('div', { class: 'card' },
+          h('div', { class: 'row sp' },
+            h('h3', {}, lamp(!p.enabled ? 'off' : p.keys.some(k => k.status === 'ready') || p.kind !== 'openai' ? 'ready' : 'locked'), name, h('span', { class: 'chip' }, p.kind)),
+            h('span', { class: 'row' }, ...p.keys.map(k => lamp(k.status)))))),
+        h('h2', {}, 'Recent requests'),
+        S.recent.length ? h('div', { class: 'card' }, ...S.recent.slice(0, 12).map(r =>
+          h('div', { class: 'keyrow' }, h('span', { class: r.status === 200 ? 'ok' : 'err mono' }, r.status), h('span', { class: 'grow mono' }, r.model),
+            h('span', { class: 'muted' }, `${r.ms} ms · ${ago(r.t)} ago`)))) : h('p', { class: 'muted' }, 'Nothing yet.'));
+    };
+    await draw();
+    refreshEvery(5000, () => draw().catch(() => {}));
+  }
+
+  // ------------------------------------------------------------ providers
+  const KINDS = [['preset', 'Ready-made provider'], ['openai', 'Other OpenAI-compatible server'], ['ollama', 'Another Ollama server'], ['http', 'Custom HTTP endpoint']];
+  async function providers(root) {
+    const form = h('div');
+    const redraw = () => show();
+    const list = Object.entries(S.providers).map(([name, p]) => providerCard(name, p, redraw));
+    root.append(
+      h('button', { class: 'b p', type: 'button', onclick: () => { form.hidden = !form.hidden; } }, 'Add provider'),
+      form, ...list);
+    form.hidden = true;
+    form.append(addForm(redraw));
+  }
+
+  function addForm(done) {
+    const kind = h('select', {}, KINDS.map(([v, l]) => h('option', { value: v }, l)));
+    const preset = h('select', {}, Object.entries(S.presets).map(([k, v]) => h('option', { value: k }, v.label)));
+    const name = h('input', { placeholder: 'name, e.g. gemini' }), url = h('input', { placeholder: 'https://…/v1' }), key = h('input', { type: 'password', placeholder: 'API key (optional)' });
+    const rUrl = h('input', { placeholder: 'https://example.com/api/chat?model={{model}}' });
+    const rMethod = h('select', {}, ['POST', 'GET'].map(m => h('option', {}, m)));
+    const rHeaders = h('textarea', { placeholder: '{"Authorization": "Bearer …"}' });
+    const rBody = h('textarea', { placeholder: '{"prompt": "{{prompt}}"}' });
+    const rPath = h('input', { placeholder: 'reply text path, e.g. data.answer' });
+    const rStream = h('select', {}, [['none', 'No streaming'], ['sse', 'Server-sent events'], ['ndjson', 'JSON lines']].map(([v, l]) => h('option', { value: v }, l)));
+    const rSPath = h('input', { placeholder: 'stream text path (default choices.0.delta.content)' });
+    const rModels = h('input', { placeholder: 'model names to list, comma-separated (optional)' });
+    const box = h('div');
+    const sync = () => {
+      const k = kind.value;
+      if (k === 'preset') { name.value = preset.value; url.value = S.presets[preset.value].base_url; }
+      box.replaceChildren(
+        ...(k === 'preset' ? field('Provider', preset) : []),
+        ...field('Name (used as the model prefix)', name),
+        ...(k === 'http' ? [
+          ...field('Request URL', rUrl), ...field('Method', rMethod), ...field('Headers (JSON)', rHeaders),
+          ...field('Body template (JSON)', rBody), ...field('Reply text path', rPath),
+          ...field('Streaming', rStream), ...field('Stream text path', rSPath), ...field('Model names', rModels),
+          h('p', { class: 'muted' }, 'Placeholders: {{model}} {{prompt}} {{last_user}} {{system}} {{messages}} {{temperature}} {{max_tokens}}. For services you are allowed to call. This does not get past a site’s bot checks or logins.'),
+        ] : [...field(k === 'ollama' ? 'Ollama address (empty = the main one)' : 'Base URL', url), ...(k === 'ollama' ? [] : field('API key', key))]));
+    };
+    kind.onchange = sync; preset.onchange = sync;
+    sync();
+    const save = act(async () => {
+      const k = kind.value;
+      const spec = { name: name.value, kind: k === 'preset' ? 'openai' : k, base_url: url.value, key: key.value };
+      if (k === 'http') {
+        const parse = (t, what) => { try { return t.trim() ? JSON.parse(t) : undefined; } catch (e) { throw new Error(what + ' must be valid JSON'); } };
+        spec.recipe = { url: rUrl.value, method: rMethod.value, headers: parse(rHeaders.value, 'Headers'), body: rBody.value.trim() ? (parse(rBody.value, 'Body') ?? rBody.value) : undefined,
+          response_path: rPath.value, stream: rStream.value, stream_path: rSPath.value, models: rModels.value.split(',').map(s => s.trim()).filter(Boolean) };
+      }
+      await api('providers', { method: 'POST', json: spec });
+      toast('Saved'); done();
+    });
+    return h('div', { class: 'card' }, ...field('Type', kind), box, h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'b p', type: 'button', onclick: save }, 'Save provider')));
+  }
+
+  function providerCard(name, p, redraw) {
+    const out = h('div', { class: 'muted' });
+    const newKey = h('input', { type: 'password', placeholder: 'Add another API key' });
+    const spec = patch => api('providers', { method: 'POST', json: { name, kind: p.kind, base_url: p.base_url, recipe: p.recipe, enabled: p.enabled, mode: p.mode, ignore: p.ignore, whitelist: p.whitelist, ...patch } });
+    const hide = h('input', { value: (p.ignore || []).join(', '), placeholder: 'Hide models matching, e.g. *-preview*' });
+    hide.onchange = act(async () => { await spec({ ignore: hide.value.split(',').map(s => s.trim()).filter(Boolean) }); toast('Saved'); });
+    const mode = h('select', {}, [['', 'Default rotation'], ['balanced', 'Balanced (spread load)'], ['sequential', 'Sequential (use one until it fails)']].map(([v, l]) => h('option', { value: v, selected: v === (p.mode || '') }, l)));
+    mode.onchange = act(async () => { await spec({ mode: mode.value }); toast('Saved'); });
+    return h('div', { class: 'card' },
+      h('div', { class: 'row sp' },
+        h('h3', {}, lamp(p.enabled ? 'ready' : 'off'), name, h('span', { class: 'chip' }, p.kind)),
+        h('button', { class: 'b', type: 'button', onclick: act(async () => { await spec({ enabled: !p.enabled }); redraw(); }) }, p.enabled ? 'Disable' : 'Enable')),
+      p.base_url ? h('div', { class: 'mono muted' }, p.base_url) : (p.kind === 'ollama' ? h('div', { class: 'muted' }, 'Uses the Ollama address from Settings') : null),
+      p.recipe ? h('div', { class: 'mono muted' }, p.recipe.url) : null,
+      p.kind !== 'http' && !(p.kind === 'ollama') ? [
+        h('div', { style: 'margin-top:8px' }, ...p.keys.map(k => h('div', { class: 'keyrow' },
+          lamp(k.status), h('span', { class: 'mono grow' }, k.masked, k.source === 'env' ? ' (from settings)' : ''),
+          h('span', { class: 'muted' }, k.status === 'ready' ? `${k.used} used · ${k.errors} errors` : k.status === 'locked' ? 'rejected by provider' : `resting ${k.cooldown_s}s`),
+          k.status !== 'ready' ? h('button', { class: 'b', type: 'button', onclick: act(async () => { await api(`providers/${name}/keys/${k.id}/reset`, { method: 'POST' }); redraw(); }) }, 'Retry now') : null,
+          k.source === 'saved' ? h('button', { class: 'b d', type: 'button', onclick: act(async () => { await api(`providers/${name}/keys/${k.id}`, { method: 'DELETE' }); redraw(); }) }, 'Remove') : null))),
+        h('div', { class: 'row', style: 'margin-top:8px' }, h('div', { class: 'grow' }, newKey),
+          h('button', { class: 'b p', type: 'button', onclick: act(async () => { await api(`providers/${name}/keys`, { method: 'POST', json: { key: newKey.value } }); redraw(); }) }, 'Add'))] : null,
+      ...field('Rotation', mode), ...field('Hide models', hide),
+      h('div', { class: 'row', style: 'margin-top:10px' },
+        h('button', { class: 'b', type: 'button', onclick: act(async () => {
+          out.textContent = 'Testing…'; const r = await api(`providers/${name}/test`, { method: 'POST', json: {} });
+          out.className = r.ok ? 'ok' : 'err'; out.textContent = r.ok ? `Works (${r.model}, ${r.ms} ms): “${r.reply}”` : r.error; }) }, 'Test'),
+        h('button', { class: 'b', type: 'button', onclick: act(async () => {
+          const r = await api(`providers/${name}/models`); out.className = 'muted mono';
+          out.textContent = r.models.length ? r.models.slice(0, 60).join('\n') + (r.models.length > 60 ? `\n…and ${r.models.length - 60} more` : '') : 'No models listed.'; out.style.whiteSpace = 'pre-wrap'; }) }, 'List models'),
+        name !== 'ollama' ? h('button', { class: 'b d', type: 'button', onclick: act(async () => { if (!confirm(`Remove ${name}?`)) return; await api('providers/' + name, { method: 'DELETE' }); redraw(); }) }, 'Remove') : null),
+      out);
+  }
+
+  // ------------------------------------------------------------ models (host your own AI)
+  async function models(root) {
+    clearInterval(timer);
+    const body = h('div');
+    const sub = h('div', { class: 'sub' }, [['installed', 'Installed'], ['find', 'Find & download'], ['jobs', 'Downloads']].map(([id, l]) =>
+      h('button', { type: 'button', 'aria-pressed': id === modelsTab, onclick: () => { modelsTab = id; models(root); } }, l)));
+    root.replaceChildren(sub, body);
+    if (!S.ollama.ok) body.append(h('div', { class: 'note' }, S.ollama.error, ' ', h('button', { class: 'b', type: 'button', onclick: () => { tab = 'settings'; show(); } }, 'Open settings')));
+    await ({ installed, find, jobs }[modelsTab])(body, root);
+  }
+
+  async function installed(body) {
+    if (!S.ollama.ok) return;
+    const { models: list } = await api('models/installed');
+    body.append(list.length ? list.map(m => h('div', { class: 'card' },
+      h('div', { class: 'row sp' }, h('h3', {}, lamp(m.loaded ? 'ready' : 'off'), h('span', { class: 'mono' }, m.name)),
+        h('span', { class: 'muted' }, m.size_h)),
+      h('div', { class: 'row' }, m.params ? h('span', { class: 'chip' }, m.params) : null, m.quant ? h('span', { class: 'chip' }, m.quant) : null, m.family ? h('span', { class: 'chip' }, m.family) : null,
+        h('span', { class: 'muted' }, m.loaded ? 'in memory' : 'on disk')),
+      h('div', { class: 'row', style: 'margin-top:8px' },
+        h('button', { class: 'b', type: 'button', disabled: !m.loaded, onclick: act(async () => { await api('models/unload', { method: 'POST', json: { name: m.name } }); toast('Unloaded'); show(); }) }, 'Free memory'),
+        h('button', { class: 'b d', type: 'button', onclick: act(async () => { if (!confirm(`Delete ${m.name}? ${m.size_h} will be freed.`)) return; await api('models/delete', { method: 'POST', json: { name: m.name } }); show(); }) }, 'Delete'))))
+      : h('p', { class: 'muted' }, 'No models downloaded yet. Use “Find & download”.'));
+  }
+
+  async function startPull(name) {
+    await api('models/pull', { method: 'POST', json: { name } });
+    toast('Download started'); modelsTab = 'jobs'; show();
+  }
+
+  async function find(body) {
+    const q = h('input', { type: 'search', placeholder: 'Search models, e.g. llama, qwen, gemma, coder', enterkeyhint: 'search' });
+    const src = h('select', {}, [['all', 'Ollama library + Hugging Face'], ['ollama', 'Ollama library only'], ['hf', 'Hugging Face (GGUF) only']].map(([v, l]) => h('option', { value: v }, l)));
+    const results = h('div'), byName = h('input', { placeholder: 'or type an exact name: llama3.1:8b, hf.co/user/repo:Q4_K_M' });
+    const run = act(async () => {
+      results.replaceChildren(h('p', { class: 'muted' }, 'Searching…'));
+      const r = await api(`models/search?q=${encodeURIComponent(q.value)}&source=${src.value}`);
+      results.replaceChildren(...r.notes.map(n => h('p', { class: 'muted' }, n)),
+        ...(r.results.length ? r.results.map(resultCard) : [h('p', { class: 'muted' }, 'No matches. Try another word, or download by exact name above.')]));
+    });
+    q.onkeydown = e => { if (e.key === 'Enter') run(); };
+    body.append(
+      h('div', { class: 'card' }, h('div', { class: 'row' }, h('div', { class: 'grow' }, q), h('button', { class: 'b p', type: 'button', onclick: run }, 'Search')), h('div', { style: 'margin-top:8px' }, src)),
+      h('div', { class: 'card' }, h('div', { class: 'row' }, h('div', { class: 'grow' }, byName),
+        h('button', { class: 'b p', type: 'button', onclick: act(() => startPull(byName.value)) }, 'Download'))),
+      results);
+    run();
+  }
+
+  function resultCard(r) {
+    const quants = h('div');
+    const pulls = r.source === 'hf'
+      ? h('button', { class: 'b', type: 'button', onclick: act(async () => {
+          const { quants: qs } = await api('models/quants?repo=' + encodeURIComponent(r.id));
+          quants.replaceChildren(...(qs.length ? qs.map(x => h('div', { class: 'keyrow' }, h('span', { class: 'mono grow' }, x.quant), h('span', { class: 'muted' }, x.size_h),
+            h('button', { class: 'b p', type: 'button', onclick: act(() => startPull(x.pull)) }, 'Download'))) : [h('p', { class: 'muted' }, 'No GGUF files found.')]));
+        }) }, 'Pick a quantisation')
+      : h('div', { class: 'row' }, ...r.pull.map((n, i) => h('button', { class: 'b p', type: 'button', onclick: act(() => startPull(n)) }, 'Download ' + (r.sizes[i] || 'latest'))));
+    return h('div', { class: 'card' },
+      h('h3', {}, h('span', { class: 'mono' }, r.title), h('span', { class: 'chip' }, r.source === 'hf' ? 'Hugging Face' : 'Ollama')),
+      r.description ? h('p', { class: 'muted', style: 'margin:0 0 6px' }, r.description) : null,
+      h('div', { class: 'row', style: 'margin-bottom:8px' }, ...r.capabilities.map(c => h('span', { class: 'chip' }, c)),
+        r.downloads ? h('span', { class: 'muted' }, r.downloads + ' downloads') : null, r.updated ? h('span', { class: 'muted' }, r.updated) : null),
+      pulls, quants);
+  }
+
+  const meter = pct => h('div', { class: 'meter', role: 'progressbar', 'aria-valuenow': Math.round(pct), 'aria-valuemin': 0, 'aria-valuemax': 100 },
+    Array.from({ length: 20 }, (_, i) => h('i', { class: i < Math.round(pct / 5) ? 'on' : '' })));
+
+  async function jobs(body) {
+    const draw = async () => {
+      const { jobs: list } = await api('jobs');
+      body.replaceChildren(...(list.length ? list.map(j => {
+        const pct = j.total ? j.completed / j.total * 100 : (j.status === 'done' ? 100 : 0);
+        return h('div', { class: 'card' },
+          h('div', { class: 'row sp' }, h('span', { class: 'mono' }, j.name), h('span', { class: j.status === 'error' ? 'err' : j.status === 'done' ? 'ok' : 'muted' }, j.status)),
+          meter(pct),
+          h('div', { class: 'row sp muted' }, h('span', {}, j.total ? `${mb(j.completed)} of ${mb(j.total)}` : j.message), h('span', {}, j.total ? Math.round(pct) + '%' : '')),
+          j.status === 'error' ? h('p', { class: 'err' }, j.message) : null,
+          ['queued', 'pulling'].includes(j.status) ? h('button', { class: 'b d', type: 'button', onclick: act(async () => { await api(`jobs/${j.id}/cancel`, { method: 'POST' }); draw(); }) }, 'Cancel') : null);
+      }) : [h('p', { class: 'muted' }, 'No downloads yet.')]));
+    };
+    await draw();
+    refreshEvery(1500, () => draw().catch(() => {}));
+  }
+
+  // ------------------------------------------------------------ routes
+  async function routes(root) {
+    const { models: all } = await api('all-models');
+    const rows = Object.entries(S.routes).map(([k, v]) => [k, v.join('\n')]);
+    const box = h('div');
+    const draw = () => box.replaceChildren(...rows.map((r, i) => {
+      const nm = h('input', { value: r[0], placeholder: 'route name, e.g. fast' }); nm.oninput = () => { r[0] = nm.value; };
+      const ta = h('textarea', { placeholder: 'one model per line, tried in order' }); ta.value = r[1]; ta.oninput = () => { r[1] = ta.value; };
+      const pick = h('select', {}, [h('option', { value: '' }, 'Add a model…'), ...all.filter(m => m.provider !== 'route').map(m => h('option', { value: m.id }, m.id))]);
+      pick.onchange = () => { if (pick.value) { ta.value = (ta.value.trim() + '\n' + pick.value).trim(); r[1] = ta.value; pick.value = ''; } };
+      return h('div', { class: 'card' }, nm, h('div', { style: 'height:8px' }), ta, h('div', { class: 'row', style: 'margin-top:8px' }, h('div', { class: 'grow' }, pick),
+        h('button', { class: 'b d', type: 'button', onclick: () => { rows.splice(i, 1); draw(); } }, 'Remove')));
+    }));
+    draw();
+    root.append(h('p', { class: 'muted' }, 'A route is a model name of your own. Requests try its models in order, so when one provider is down or out of quota the next one answers. Use the route name as the model in any app.'),
+      box, h('div', { class: 'row' },
+        h('button', { class: 'b', type: 'button', onclick: () => { rows.push(['', '']); draw(); } }, 'Add route'),
+        h('button', { class: 'b p', type: 'button', onclick: act(async () => { await api('routes', { method: 'PUT', json: Object.fromEntries(rows.filter(r => r[0].trim()).map(r => [r[0].trim(), r[1]])) }); toast('Routes saved'); }) }, 'Save routes')));
+  }
+
+  // ------------------------------------------------------------ chat playground
+  async function chatTab(root) {
+    const { models: all } = await api('all-models');
+    const sel = h('select', {}, all.map(m => h('option', { value: m.id }, m.id)));
+    sel.value = sessionStorage.getItem('gw-model') && all.some(m => m.id === sessionStorage.getItem('gw-model')) ? sessionStorage.getItem('gw-model') : (all[0]?.id || '');
+    sel.onchange = () => sessionStorage.setItem('gw-model', sel.value);
+    const log = h('div', { id: 'chatlog' }), input = h('textarea', { placeholder: 'Message', style: 'min-height:60px;font-family:var(--sans)' });
+    const draw = () => log.replaceChildren(...chat.map(m => h('div', { class: 'm ' + (m.role === 'user' ? 'u' : 'a') }, m.content)));
+    const send = act(async () => {
+      const text = input.value.trim(); if (!text || !sel.value) return;
+      input.value = ''; chat.push({ role: 'user', content: text }); const reply = { role: 'assistant', content: '' }; chat.push(reply); draw();
+      const r = await api('playground', { method: 'POST', json: { model: sel.value, stream: true, messages: chat.slice(0, -1) }, raw: true });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); reply.content = '⚠ ' + (j.error?.message || j.error || r.statusText); return draw(); }
+      const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+      for (;;) {
+        const { done, value } = await rd.read(); if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i; while ((i = buf.indexOf('\n\n')) >= 0) {
+          const line = buf.slice(0, i).trim(); buf = buf.slice(i + 2);
+          if (!line.startsWith('data:') || line.endsWith('[DONE]')) continue;
+          try { const j = JSON.parse(line.slice(5)); reply.content += j.choices?.[0]?.delta?.content || ''; if (j.error) reply.content += '⚠ ' + j.error.message; } catch (e) {}
+        }
+        draw();
+      }
+      if (!reply.content) reply.content = '(empty reply)'; draw();
+    });
+    root.append(...field('Model', sel), log, input,
+      h('div', { class: 'row', style: 'margin-top:8px' }, h('button', { class: 'b p', type: 'button', onclick: send }, 'Send'),
+        h('button', { class: 'b', type: 'button', onclick: () => { chat.length = 0; draw(); } }, 'Clear')));
+    draw();
+  }
+
+  // ------------------------------------------------------------ settings
+  async function settings(root) {
+    const s = S.settings, locked = k => S.env_locked.includes(k);
+    const rot = h('select', {}, [['balanced', 'Balanced: spread requests across keys'], ['sequential', 'Sequential: stick to one key until it fails']].map(([v, l]) => h('option', { value: v, selected: v === s.rotation }, l)));
+    const cool = h('input', { value: s.cooldowns.join(', ') }), to = h('input', { type: 'number', value: s.timeout_s });
+    const ou = h('input', { value: s.ollama_url, disabled: locked('ollama_url') }), pre = h('textarea', { disabled: locked('ollama_preload') }); pre.value = s.ollama_preload;
+    root.append(
+      h('div', { class: 'card' }, h('h3', {}, 'Proxy key'), h('p', { class: 'muted' }, 'Apps send this as their API key. Changing it signs out every app until you update them.'),
+        h('div', { class: 'row' },
+          h('button', { class: 'b', type: 'button', onclick: () => copy(S.proxy_key) }, 'Copy'),
+          h('button', { class: 'b d', type: 'button', onclick: act(async () => { if (!confirm('Create a new key? Apps using the old one will stop working.')) return; const r = await api('proxy-key/regenerate', { method: 'POST' }); sessionStorage.setItem('gw-token', r.proxy_key); toast('New key created'); show(); }) }, 'Generate a new key'))),
+      h('div', { class: 'card' }, h('h3', {}, 'Key rotation'),
+        ...field('Default mode', rot), ...field('Rest times after repeated failures (seconds, in order)', cool), ...field('Wait for a provider (seconds)', to)),
+      h('div', { class: 'card' }, h('h3', {}, 'Local models (Ollama)'),
+        ...field(locked('ollama_url') ? 'Ollama address (set in add-on options or environment)' : 'Ollama address', ou),
+        ...field(locked('ollama_preload') ? 'Download on start (set in add-on options or environment)' : 'Download on start (comma-separated names)', pre)),
+      h('button', { class: 'b p', type: 'button', onclick: act(async () => {
+        await api('settings', { method: 'PUT', json: { rotation: rot.value, cooldowns: cool.value.split(',').map(x => x.trim()).filter(Boolean), timeout_s: to.value, ollama_url: ou.value, ollama_preload: pre.value } });
+        toast('Saved'); show(); }) }, 'Save settings'),
+      h('p', { class: 'muted' }, `Up ${Math.round(S.uptime_s / 60)} min`));
+  }
+
+  show();
+})();
+</script>
+</body>
+</html>
