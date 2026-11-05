@@ -39,7 +39,14 @@ docker compose up -d --build
 ```
 Open `http://<host>:8000`, sign in with the proxy key (or `ADMIN_PASSWORD`). Everything you add in the page is saved in `./data`.
 
-**Home Assistant add-on:** add the repository, install *Personal AI Gateway*, set the Ollama address (page → Settings → Ollama address → Test connection, or the `ollama_url` option): the LAN address of the machine running Ollama, e.g. `http://192.168.1.50:11434`, never localhost. Ollama must listen on the network (`OLLAMA_HOST=0.0.0.0`), optionally `api_keys`, start. Open it from the sidebar. An add-on can't run Ollama inside itself, so Ollama stays a separate container.
+**Home Assistant add-on:** add the repository, install *Personal AI Gateway*, start it. **Ollama is built in**, so no other device is needed: open the add-on → Models → Find & download, pick a model, and it runs on this machine. (Settings → Ollama address should read `http://127.0.0.1:11434`; press *Use the built-in Ollama* if not.)
+
+Things to know about the built-in Ollama:
+
+- **CPU only.** Add-ons can't use a GPU, so replies are slower than on a GPU machine. On a Raspberry Pi or small mini-PC pick small models (1B to 4B parameters, e.g. `llama3.2:3b`, `qwen3:4b`, `gemma3:4b`). A 7B-8B model at the default 4-bit size needs about 5-6 GB of free RAM.
+- **RAM and disk:** a model is loaded in RAM while in use (see *Keep models in memory for*) and each one takes 1-5 GB of disk in the add-on's data. Models are excluded from Home Assistant backups.
+- **Use it elsewhere:** other apps can use `http://local-personal-ai-gateway:8000/v1` (the gateway, with your key). To let something talk to Ollama directly, set a host port for `11434/tcp` in the add-on's Network section; that port has no password, so keep it on your home network.
+- **An Ollama on another device instead:** turn off *Built-in Ollama*, then set its address in Settings and press *Test connection*.
 
 ## Settings by environment / add-on options
 
@@ -47,7 +54,8 @@ Open `http://<host>:8000`, sign in with the proxy key (or `ADMIN_PASSWORD`). Eve
 
 ## Troubleshooting
 
-- **Downloads fail / "Can't reach Ollama":** the address in Settings is wrong or Ollama isn't listening on the network. Use Settings → Test connection.
+- **Downloads fail / "Can't reach Ollama":** with the built-in Ollama the address must be `http://127.0.0.1:11434` (Settings → *Use the built-in Ollama*). For an Ollama elsewhere it must be that machine's LAN address. Use Settings → Test connection, and check the add-on log.
+- **Out of memory / add-on restarts while chatting:** the model is too big for the free RAM. Pick a smaller one or a smaller quantisation.
 - **A provider lists no models:** press *List models* on its card; the exact reason (bad key, HTTP 403, network) is shown, and written to the add-on log. Chat can still work: use the full name, e.g. `gemini/gemini-2.5-flash`, or add names under *Extra models* so apps' model pickers show them.
 - **Test** with a model name typed in the box if listing is blocked for your key.
 

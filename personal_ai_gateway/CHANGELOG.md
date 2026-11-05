@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0
+
+- **Built-in Ollama in the add-on** (CPU): no separate device needed. Starts with the add-on, models kept in `/data/ollama` and excluded from backups. Options: `builtin_ollama`, `ollama_keep_alive`; optional host port for `11434/tcp`.
+- The add-on image is now Ubuntu-based (Ollama needs glibc).
+
 ## 1.0.1
 
 - Provider model listing now shows (and logs) why it failed instead of an empty list; failed listings are retried after 20 s instead of cached for 5 minutes.

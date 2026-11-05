@@ -1,8 +1,8 @@
 name: Personal AI Gateway
-version: "1.0.1"
+version: "1.1.0"
 slug: personal_ai_gateway
 image: "ghcr.io/jonathangibson98/{arch}-addon-personal_ai_gateway"
-description: One OpenAI-compatible endpoint for all your AI keys and your own downloaded models, with key rotation, fallback routes and a model search
+description: Built-in Ollama plus one OpenAI-compatible endpoint for all your AI keys, with key rotation, fallback routes and a model search
 arch:
   - aarch64
   - amd64
@@ -15,15 +15,23 @@ panel_icon: mdi:router-network
 panel_title: AI Gateway
 ports:
   8000/tcp: 8000
+  11434/tcp: null
 ports_description:
-  8000/tcp: OpenAI-compatible API (apps must send the proxy key)
+  8000/tcp: "OpenAI-compatible API (apps must send the proxy key)"
+  11434/tcp: "Built-in Ollama (optional, no password, only open it on a trusted network)"
+backup_exclude:
+  - /data/ollama/**
 options:
+  builtin_ollama: true
+  ollama_keep_alive: "5m"
   proxy_key: ""
   admin_password: ""
   ollama_url: ""
   ollama_preload: ""
   api_keys: []
 schema:
+  builtin_ollama: bool
+  ollama_keep_alive: str?
   proxy_key: password?
   admin_password: password?
   ollama_url: str?
