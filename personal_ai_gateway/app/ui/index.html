@@ -109,7 +109,7 @@ label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
   }
   function toast(msg, bad) {
     const t = $('#toast'); t.textContent = msg; t.hidden = false; t.style.background = bad ? 'var(--danger)' : '';
-    clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 3500);
+    clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, bad ? 9000 : 3500);
   }
   const act = fn => async ev => {
     const b = ev?.currentTarget; if (b) b.disabled = true;
@@ -235,8 +235,11 @@ label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
 
   function providerCard(name, p, redraw) {
     const out = h('div', { class: 'muted' });
+    const testModel = h('input', { placeholder: 'Model to test (optional)' });
+    const extra = h('input', { value: (p.models || []).join(', '), placeholder: 'Extra model names to offer, comma-separated' });
+    extra.onchange = act(async () => { await spec({ models: extra.value.split(',').map(s => s.trim()).filter(Boolean) }); toast('Saved'); });
     const newKey = h('input', { type: 'password', placeholder: 'Add another API key' });
-    const spec = patch => api('providers', { method: 'POST', json: { name, kind: p.kind, base_url: p.base_url, recipe: p.recipe, enabled: p.enabled, mode: p.mode, ignore: p.ignore, whitelist: p.whitelist, ...patch } });
+    const spec = patch => api('providers', { method: 'POST', json: { name, kind: p.kind, base_url: p.base_url, recipe: p.recipe, enabled: p.enabled, mode: p.mode, ignore: p.ignore, whitelist: p.whitelist, models: p.models, ...patch } });
     const hide = h('input', { value: (p.ignore || []).join(', '), placeholder: 'Hide models matching, e.g. *-preview*' });
     hide.onchange = act(async () => { await spec({ ignore: hide.value.split(',').map(s => s.trim()).filter(Boolean) }); toast('Saved'); });
     const mode = h('select', {}, [['', 'Default rotation'], ['balanced', 'Balanced (spread load)'], ['sequential', 'Sequential (use one until it fails)']].map(([v, l]) => h('option', { value: v, selected: v === (p.mode || '') }, l)));
@@ -255,14 +258,14 @@ label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
           k.source === 'saved' ? h('button', { class: 'b d', type: 'button', onclick: act(async () => { await api(`providers/${name}/keys/${k.id}`, { method: 'DELETE' }); redraw(); }) }, 'Remove') : null))),
         h('div', { class: 'row', style: 'margin-top:8px' }, h('div', { class: 'grow' }, newKey),
           h('button', { class: 'b p', type: 'button', onclick: act(async () => { await api(`providers/${name}/keys`, { method: 'POST', json: { key: newKey.value } }); redraw(); }) }, 'Add'))] : null,
-      ...field('Rotation', mode), ...field('Hide models', hide),
+      ...field('Rotation', mode), ...field('Hide models', hide), ...(p.kind === 'http' ? [] : field('Extra models', extra)), ...field('Test with this model', testModel),
       h('div', { class: 'row', style: 'margin-top:10px' },
         h('button', { class: 'b', type: 'button', onclick: act(async () => {
-          out.textContent = 'Testing…'; const r = await api(`providers/${name}/test`, { method: 'POST', json: {} });
+          out.textContent = 'Testing…'; const r = await api(`providers/${name}/test`, { method: 'POST', json: { model: testModel.value } });
           out.className = r.ok ? 'ok' : 'err'; out.textContent = r.ok ? `Works (${r.model}, ${r.ms} ms): “${r.reply}”` : r.error; }) }, 'Test'),
         h('button', { class: 'b', type: 'button', onclick: act(async () => {
           const r = await api(`providers/${name}/models`); out.className = 'muted mono';
-          out.textContent = r.models.length ? r.models.slice(0, 60).join('\n') + (r.models.length > 60 ? `\n…and ${r.models.length - 60} more` : '') : 'No models listed.'; out.style.whiteSpace = 'pre-wrap'; }) }, 'List models'),
+          out.textContent = (r.error ? 'Problem: ' + r.error + '\n\n' : '') + (r.models.length ? r.models.slice(0, 60).join('\n') + (r.models.length > 60 ? `\n…and ${r.models.length - 60} more` : '') : 'No models listed.'); out.className = r.error ? 'err mono' : 'muted mono'; out.style.whiteSpace = 'pre-wrap'; }) }, 'List models'),
         name !== 'ollama' ? h('button', { class: 'b d', type: 'button', onclick: act(async () => { if (!confirm(`Remove ${name}?`)) return; await api('providers/' + name, { method: 'DELETE' }); redraw(); }) }, 'Remove') : null),
       out);
   }
@@ -410,7 +413,7 @@ label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
     const s = S.settings, locked = k => S.env_locked.includes(k);
     const rot = h('select', {}, [['balanced', 'Balanced: spread requests across keys'], ['sequential', 'Sequential: stick to one key until it fails']].map(([v, l]) => h('option', { value: v, selected: v === s.rotation }, l)));
     const cool = h('input', { value: s.cooldowns.join(', ') }), to = h('input', { type: 'number', value: s.timeout_s });
-    const ou = h('input', { value: s.ollama_url, disabled: locked('ollama_url') }), pre = h('textarea', { disabled: locked('ollama_preload') }); pre.value = s.ollama_preload;
+    const ou = h('input', { value: s.ollama_url, disabled: locked('ollama_url'), placeholder: 'http://192.168.1.50:11434' }), pre = h('textarea', { disabled: locked('ollama_preload') }); pre.value = s.ollama_preload;
     root.append(
       h('div', { class: 'card' }, h('h3', {}, 'Proxy key'), h('p', { class: 'muted' }, 'Apps send this as their API key. Changing it signs out every app until you update them.'),
         h('div', { class: 'row' },
@@ -419,8 +422,9 @@ label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
       h('div', { class: 'card' }, h('h3', {}, 'Key rotation'),
         ...field('Default mode', rot), ...field('Rest times after repeated failures (seconds, in order)', cool), ...field('Wait for a provider (seconds)', to)),
       h('div', { class: 'card' }, h('h3', {}, 'Local models (Ollama)'),
-        ...field(locked('ollama_url') ? 'Ollama address (set in add-on options or environment)' : 'Ollama address', ou),
-        ...field(locked('ollama_preload') ? 'Download on start (set in add-on options or environment)' : 'Download on start (comma-separated names)', pre)),
+        ...field(locked('ollama_url') ? 'Ollama address (set by the OLLAMA_URL environment variable)' : 'Ollama address (LAN address of the machine running Ollama)', ou),
+        h('button', { class: 'b', type: 'button', onclick: act(async () => { const r = await api('ollama/test', { method: 'POST', json: { url: ou.value } }); r.ok ? toast('Connected: Ollama ' + r.version) : toast(r.error, true); }) }, 'Test connection'),
+        ...field(locked('ollama_preload') ? 'Download on start (set by the OLLAMA_PRELOAD environment variable)' : 'Download on start (comma-separated names)', pre)),
       h('button', { class: 'b p', type: 'button', onclick: act(async () => {
         await api('settings', { method: 'PUT', json: { rotation: rot.value, cooldowns: cool.value.split(',').map(x => x.trim()).filter(Boolean), timeout_s: to.value, ollama_url: ou.value, ollama_preload: pre.value } });
         toast('Saved'); show(); }) }, 'Save settings'),
