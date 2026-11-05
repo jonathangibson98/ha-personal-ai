@@ -4,6 +4,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 from pathlib import Path
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
@@ -29,6 +30,8 @@ DEFAULT_SETTINGS = {
     "ollama_preload": "",
 }
 
+BUNDLED_URL = "http://127.0.0.1:11434"
+LEGACY_ADDON_URL = "http://172.30.32.1:11434"  # old add-on default, ignored when Ollama is built in
 NAME_RE = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}")
 
 
@@ -97,9 +100,18 @@ class Store:
             return os.environ[env].strip()
         if key in self.data["settings"]:
             return self.data["settings"][key]
-        if key in ("ollama_url", "ollama_preload") and str(self.options.get(key) or "").strip():
-            return str(self.options[key]).strip()
+        opt = str(self.options.get(key) or "").strip() if key in ("ollama_url", "ollama_preload") else ""
+        if key == "ollama_url" and self.bundled_enabled() and opt in ("", LEGACY_ADDON_URL):
+            return BUNDLED_URL
+        if opt:
+            return opt
         return DEFAULT_SETTINGS[key]
+
+    def bundled_enabled(self) -> bool:
+        """True in the add-on image, where Ollama is installed and the option isn't switched off."""
+        if not shutil.which("ollama") or os.environ.get("BUILTIN_OLLAMA", "").strip() == "0":
+            return False
+        return self.options.get("builtin_ollama", True) is not False
 
     def settings(self) -> dict:
         return {k: self.setting(k) for k in DEFAULT_SETTINGS}

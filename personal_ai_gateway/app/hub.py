@@ -3,9 +3,11 @@ import asyncio
 import html
 import json
 import logging
+import os
 import re
 import time
 import uuid
+from pathlib import Path
 
 from aiohttp import ClientError, ClientTimeout
 
@@ -68,6 +70,30 @@ def quants_from_files(siblings: list[dict]) -> list[dict]:
 
 
 # ------------------------------------------------------------ Ollama client
+
+async def run_bundled(store) -> None:
+    """Run `ollama serve` inside this container and restart it if it ever stops."""
+    root = Path(os.environ.get("DATA_DIR", "/data")) / "ollama"
+    (root / "models").mkdir(parents=True, exist_ok=True)
+    env = {**os.environ, "HOME": str(root), "OLLAMA_MODELS": str(root / "models"), "OLLAMA_HOST": "0.0.0.0:11434",
+           "OLLAMA_KEEP_ALIVE": str(store.options.get("ollama_keep_alive") or "5m"),
+           "OLLAMA_NUM_PARALLEL": "1", "OLLAMA_MAX_LOADED_MODELS": "1"}
+    while True:
+        proc = await asyncio.create_subprocess_exec("ollama", "serve", env=env, stdout=asyncio.subprocess.PIPE,
+                                                    stderr=asyncio.subprocess.STDOUT)
+        log.info("Built-in Ollama started (models in %s)", root / "models")
+        try:
+            async for line in proc.stdout:
+                text = line.decode("utf-8", "replace").rstrip()
+                if "level=WARN" in text or "level=ERROR" in text or "error" in text.lower():
+                    log.warning("ollama: %s", text[:300])
+            await proc.wait()
+        except asyncio.CancelledError:
+            proc.terminate()
+            raise
+        log.warning("Built-in Ollama stopped (exit code %s); restarting in 5 s", proc.returncode)
+        await asyncio.sleep(5)
+
 
 class OllamaError(Exception):
     pass

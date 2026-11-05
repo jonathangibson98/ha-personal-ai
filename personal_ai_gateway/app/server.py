@@ -16,12 +16,12 @@ from pathlib import Path
 
 from aiohttp import ClientSession, ClientTimeout, FormData, web
 
-from hub import Hub, OllamaError
+from hub import Hub, OllamaError, run_bundled
 from rotator import KeyPool, kid
 from store import DATA_DIR, PRESETS, Store
 from upstream import Gateway, err, sanitize
 
-VERSION = "1.0.1"
+VERSION = "1.1.0"
 TEST_MODELS = {"gemini": "gemini-2.5-flash", "openai": "gpt-4o-mini", "groq": "llama-3.3-70b-versatile",
                "mistral": "mistral-small-latest", "deepseek": "deepseek-chat", "cerebras": "llama3.1-8b"}
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -150,7 +150,7 @@ async def api_state(request):
         "version": VERSION, "uptime_s": int(time.time() - START), "proxy_key": STORE.proxy_key,
         "providers": providers, "routes": STORE.data["routes"], "settings": STORE.settings(),
         "presets": {k: v for k, v in PRESETS.items()}, "recent": list(GW.recent)[:30],
-        "ollama": await HUB.status(), "addon": bool(INGRESS_IP),
+        "ollama": await HUB.status(), "addon": bool(INGRESS_IP), "bundled": STORE.bundled_enabled(),
         "env_locked": [k for k, e in (("ollama_url", "OLLAMA_URL"), ("ollama_preload", "OLLAMA_PRELOAD"))
                        if os.environ.get(e, "").strip()],
     })
@@ -316,6 +316,8 @@ async def background(app):
             await asyncio.sleep(30)
             POOL.save()
     tasks = [asyncio.create_task(saver()), asyncio.create_task(HUB.preload())]
+    if STORE.bundled_enabled():
+        tasks.append(asyncio.create_task(run_bundled(STORE)))
     yield
     for t in tasks:
         t.cancel()
