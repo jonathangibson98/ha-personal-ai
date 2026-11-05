@@ -6,14 +6,25 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_API_KEY, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.httpx_client import get_async_client
 from openai import AsyncOpenAI, AuthenticationError, OpenAIError
 
-from .const import LOGGER, TIMEOUT, PersonalAiConfigKey
+from .const import DOMAIN, LOGGER, TIMEOUT, PersonalAiConfigKey
+from .services import async_register_services
 
 PLATFORMS = [Platform.AI_TASK, Platform.CONVERSATION, Platform.STT, Platform.TTS]
 
 type PersonalAiConfigEntry = ConfigEntry[AsyncOpenAI]
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the gateway actions (search and download models)."""
+    await async_register_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: PersonalAiConfigEntry) -> bool:

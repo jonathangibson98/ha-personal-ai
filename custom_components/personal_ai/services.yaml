@@ -1,0 +1,27 @@
+search_models:
+  fields:
+    query:
+      required: true
+      example: llama
+      selector:
+        text:
+    source:
+      default: all
+      selector:
+        select:
+          options: [all, ollama, hf]
+    config_entry:
+      selector:
+        config_entry:
+          integration: personal_ai
+pull_model:
+  fields:
+    model:
+      required: true
+      example: llama3.1:8b
+      selector:
+        text:
+    config_entry:
+      selector:
+        config_entry:
+          integration: personal_ai

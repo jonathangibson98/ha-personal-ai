@@ -1,14 +1,26 @@
 {
   "domain": "personal_ai",
   "name": "Personal AI",
-  "after_dependencies": ["assist_pipeline", "intent"],
-  "codeowners": ["@jonathangibson98"],
+  "after_dependencies": [
+    "assist_pipeline",
+    "intent"
+  ],
+  "codeowners": [
+    "@jonathangibson98"
+  ],
   "config_flow": true,
-  "dependencies": ["conversation"],
+  "dependencies": [
+    "conversation"
+  ],
   "documentation": "https://github.com/jonathangibson98/ha-personal-ai",
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/jonathangibson98/ha-personal-ai/issues",
-  "requirements": ["demoji", "openai", "pylatexenc", "webcolors"],
-  "version": "1.3.0"
+  "requirements": [
+    "demoji",
+    "openai",
+    "pylatexenc",
+    "webcolors"
+  ],
+  "version": "1.4.0"
 }
