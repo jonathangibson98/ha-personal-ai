@@ -39,11 +39,17 @@ docker compose up -d --build
 ```
 Open `http://<host>:8000`, sign in with the proxy key (or `ADMIN_PASSWORD`). Everything you add in the page is saved in `./data`.
 
-**Home Assistant add-on:** add the repository, install *Personal AI Gateway*, set `ollama_url` (Ollama on the same machine as HA OS: `http://172.30.32.1:11434`, which needs Ollama's port published), optionally `api_keys`, start. Open it from the sidebar. An add-on can't run Ollama inside itself, so Ollama stays a separate container.
+**Home Assistant add-on:** add the repository, install *Personal AI Gateway*, set the Ollama address (page → Settings → Ollama address → Test connection, or the `ollama_url` option): the LAN address of the machine running Ollama, e.g. `http://192.168.1.50:11434`, never localhost. Ollama must listen on the network (`OLLAMA_HOST=0.0.0.0`), optionally `api_keys`, start. Open it from the sidebar. An add-on can't run Ollama inside itself, so Ollama stays a separate container.
 
 ## Settings by environment / add-on options
 
 `PROXY_API_KEY`, `ADMIN_PASSWORD`, `OLLAMA_URL`, `OLLAMA_PRELOAD`, and `<PROVIDER>_API_KEY_<N>` (e.g. `GEMINI_API_KEY_2`). Known provider names are created automatically; add any other OpenAI-compatible service from the Providers tab.
+
+## Troubleshooting
+
+- **Downloads fail / "Can't reach Ollama":** the address in Settings is wrong or Ollama isn't listening on the network. Use Settings → Test connection.
+- **A provider lists no models:** press *List models* on its card; the exact reason (bad key, HTTP 403, network) is shown, and written to the add-on log. Chat can still work: use the full name, e.g. `gemini/gemini-2.5-flash`, or add names under *Extra models* so apps' model pickers show them.
+- **Test** with a model name typed in the box if listing is blocked for your key.
 
 ## Good to know
 

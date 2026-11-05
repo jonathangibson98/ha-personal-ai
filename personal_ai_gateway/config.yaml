@@ -1,5 +1,5 @@
 name: Personal AI Gateway
-version: "1.0.0"
+version: "1.0.1"
 slug: personal_ai_gateway
 image: "ghcr.io/jonathangibson98/{arch}-addon-personal_ai_gateway"
 description: One OpenAI-compatible endpoint for all your AI keys and your own downloaded models, with key rotation, fallback routes and a model search
@@ -20,7 +20,7 @@ ports_description:
 options:
   proxy_key: ""
   admin_password: ""
-  ollama_url: "http://172.30.32.1:11434"
+  ollama_url: ""
   ollama_preload: ""
   api_keys: []
 schema:
