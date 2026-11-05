@@ -1,4 +1,10 @@
 configuration:
+  builtin_ollama:
+    name: Built-in Ollama
+    description: Runs Ollama inside this add-on (CPU only), so you need no other device. Models are stored in the add-on's data and left out of backups. Turn off to use an Ollama running elsewhere.
+  ollama_keep_alive:
+    name: Keep models in memory for
+    description: How long a model stays loaded after its last request, for example 5m, 30m, 0 (unload at once) or -1 (never). Loaded models use RAM.
   proxy_key:
     name: Proxy key
     description: The API key apps must send to use the gateway. Leave empty to have one generated (shown in the gateway's Settings).
@@ -15,4 +21,5 @@ configuration:
     name: API keys
     description: Provider keys. Add the same provider several times to rotate between keys. Provider names such as gemini, openai, groq, openrouter, mistral. More can be added in the gateway page.
 network:
-  8000/tcp: OpenAI-compatible API (apps must send the proxy key)
+  8000/tcp: "OpenAI-compatible API (apps must send the proxy key)"
+  11434/tcp: "Built-in Ollama (optional, has no password, only on a trusted network)"
