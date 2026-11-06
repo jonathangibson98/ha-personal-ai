@@ -11,6 +11,7 @@ import hmac
 import json
 import logging
 import os
+import shutil
 import time
 from pathlib import Path
 
@@ -21,7 +22,7 @@ from rotator import KeyPool, kid
 from store import DATA_DIR, PRESETS, Store
 from upstream import Gateway, err, sanitize
 
-VERSION = "1.1.0"
+VERSION = "1.1.2"
 TEST_MODELS = {"gemini": "gemini-2.5-flash", "openai": "gpt-4o-mini", "groq": "llama-3.3-70b-versatile",
                "mistral": "mistral-small-latest", "deepseek": "deepseek-chat", "cerebras": "llama3.1-8b"}
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -151,6 +152,7 @@ async def api_state(request):
         "providers": providers, "routes": STORE.data["routes"], "settings": STORE.settings(),
         "presets": {k: v for k, v in PRESETS.items()}, "recent": list(GW.recent)[:30],
         "ollama": await HUB.status(), "addon": bool(INGRESS_IP), "bundled": STORE.bundled_enabled(),
+        "disk_free": shutil.disk_usage(DATA_DIR).free if STORE.bundled_enabled() else None,
         "env_locked": [k for k, e in (("ollama_url", "OLLAMA_URL"), ("ollama_preload", "OLLAMA_PRELOAD"))
                        if os.environ.get(e, "").strip()],
     })

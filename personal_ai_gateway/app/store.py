@@ -105,6 +105,8 @@ class Store:
             return BUNDLED_URL
         if opt:
             return opt
+        if key == "ollama_url" and os.environ.get("OLLAMA_DEFAULT_URL", "").strip():
+            return os.environ["OLLAMA_DEFAULT_URL"].strip()  # a starting point; the page can still change it
         return DEFAULT_SETTINGS[key]
 
     def bundled_enabled(self) -> bool:

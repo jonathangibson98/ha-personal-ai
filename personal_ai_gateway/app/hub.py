@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import time
 import uuid
 from pathlib import Path
@@ -16,6 +17,8 @@ UNREACHABLE_HINT = (
     "Use the LAN address of the machine that runs Ollama, for example http://192.168.1.50:11434 "
     "(not localhost: inside this app that means the app itself). Ollama must listen on the network, "
     "e.g. OLLAMA_HOST=0.0.0.0, and port 11434 must be reachable.")
+STALL_S = 180      # no progress line for this long counts as a stalled download
+MAX_RETRIES = 3    # Ollama resumes partial downloads, so a retry loses nothing
 UA = {"User-Agent": "Mozilla/5.0 (compatible; PersonalAI-Gateway/1.0)"}
 QUANT_RE = re.compile(r"(?<![A-Za-z0-9])((?:IQ|Q)\d(?:_[A-Z0-9]+)*|BF16|F16|F32)(?![A-Za-z0-9])", re.I)
 MODEL_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]{0,200}")
@@ -79,14 +82,10 @@ async def run_bundled(store) -> None:
            "OLLAMA_KEEP_ALIVE": str(store.options.get("ollama_keep_alive") or "5m"),
            "OLLAMA_NUM_PARALLEL": "1", "OLLAMA_MAX_LOADED_MODELS": "1"}
     while True:
-        proc = await asyncio.create_subprocess_exec("ollama", "serve", env=env, stdout=asyncio.subprocess.PIPE,
-                                                    stderr=asyncio.subprocess.STDOUT)
+        # Output is inherited, so it shows in the add-on log and can never block Ollama on a full pipe.
+        proc = await asyncio.create_subprocess_exec("ollama", "serve", env=env)
         log.info("Built-in Ollama started (models in %s)", root / "models")
         try:
-            async for line in proc.stdout:
-                text = line.decode("utf-8", "replace").rstrip()
-                if "level=WARN" in text or "level=ERROR" in text or "error" in text.lower():
-                    log.warning("ollama: %s", text[:300])
             await proc.wait()
         except asyncio.CancelledError:
             proc.terminate()
@@ -165,26 +164,61 @@ class Hub:
                 self.jobs.pop(old["id"], None)
         return job
 
+    def _models_free(self) -> int | None:
+        """Free disk space where the built-in Ollama keeps models (None for an Ollama elsewhere)."""
+        from store import BUNDLED_URL
+        if not (self.store.bundled_enabled() and self.base == BUNDLED_URL):
+            return None
+        root = Path(os.environ.get("DATA_DIR", "/data")) / "ollama"
+        root.mkdir(parents=True, exist_ok=True)
+        return shutil.disk_usage(root).free
+
+    async def _pull_once(self, job: dict, layers: dict) -> None:
+        async with self.session.post(self.base + "/api/pull", json={"model": job["name"], "name": job["name"], "stream": True},
+                                     timeout=ClientTimeout(total=None, sock_connect=15, sock_read=None)) as r:
+            if r.status >= 400:
+                raise OllamaError((await r.text())[:200])
+            while True:
+                line = await asyncio.wait_for(r.content.readline(), STALL_S)  # TimeoutError = stalled
+                if not line:
+                    raise ClientError("the stream ended before Ollama reported success")
+                if not line.strip():
+                    continue
+                ev = json.loads(line)
+                if ev.get("error"):
+                    raise OllamaError(ev["error"])
+                if ev.get("digest") and ev.get("total"):
+                    layers[ev["digest"]] = [ev.get("completed", 0), ev["total"]]
+                job["completed"] = sum(c for c, _ in layers.values())
+                job["total"] = sum(t for _, t in layers.values())
+                job["message"] = ev.get("status", "")
+                job["updated"] = time.time()
+                if job["total"] and job.get("disk_checked") != job["total"]:
+                    job["disk_checked"] = job["total"]
+                    free = self._models_free()
+                    if free is not None and job["total"] - job["completed"] > free * 0.98:
+                        raise OllamaError(f"Not enough disk space: {human(job['total'] - job['completed'])} still to download, "
+                                          f"{human(free)} free. Delete a model you don't use, then try again.")
+                if ev.get("status") == "success":
+                    return
+
     async def _pull(self, job: dict) -> None:
         layers: dict[str, list[int]] = {}
         job["status"] = "pulling"
+        retries = 0
         try:
-            async with self.session.post(self.base + "/api/pull", json={"model": job["name"], "name": job["name"], "stream": True},
-                                         timeout=ClientTimeout(total=None, sock_connect=15, sock_read=600)) as r:
-                if r.status >= 400:
-                    raise OllamaError((await r.text())[:200])
-                async for line in r.content:
-                    if not line.strip():
-                        continue
-                    ev = json.loads(line)
-                    if ev.get("error"):
-                        raise OllamaError(ev["error"])
-                    if ev.get("digest") and ev.get("total"):
-                        layers[ev["digest"]] = [ev.get("completed", 0), ev["total"]]
-                    job["completed"] = sum(c for c, _ in layers.values())
-                    job["total"] = sum(t for _, t in layers.values())
-                    job["message"] = ev.get("status", "")
-                    job["updated"] = time.time()
+            while True:
+                try:
+                    await self._pull_once(job, layers)
+                    break
+                except (asyncio.TimeoutError, ClientError) as e:
+                    retries += 1
+                    if retries > MAX_RETRIES:
+                        raise
+                    why = "no progress for a while" if isinstance(e, asyncio.TimeoutError) else str(e) or type(e).__name__
+                    job["message"] = f"Stalled ({why}); resuming, attempt {retries} of {MAX_RETRIES}…"
+                    log.warning("Download of %s: %s", job["name"], job["message"])
+                    await asyncio.sleep(3)
             job.update(status="done", message="Ready to use", completed=job["total"], updated=time.time())
         except asyncio.CancelledError:
             job.update(status="cancelled", message="Cancelled", updated=time.time())
@@ -192,7 +226,9 @@ class Hub:
         except (OllamaError, ClientError, asyncio.TimeoutError, ValueError) as e:
             msg = str(e) or type(e).__name__
             if isinstance(e, (ClientError, asyncio.TimeoutError)):
-                msg = f"Lost the connection to Ollama at {self.base} ({type(e).__name__}). {UNREACHABLE_HINT}"
+                msg = (f"Gave up after {MAX_RETRIES} retries; Ollama at {self.base} stopped answering "
+                       f"({type(e).__name__}). Check the add-on log, free RAM and disk space, then start the download again; "
+                       "it continues where it stopped.")
             log.warning("Download of %s failed: %s", job["name"], msg)
             job.update(status="error", message=msg, updated=time.time())
 
