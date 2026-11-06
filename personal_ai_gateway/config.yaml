@@ -1,5 +1,5 @@
 name: Personal AI Gateway
-version: "1.1.2"
+version: "1.6.0"
 slug: personal_ai_gateway
 image: "ghcr.io/jonathangibson98/{arch}-addon-personal_ai_gateway"
 description: Built-in Ollama plus one OpenAI-compatible endpoint for all your AI keys, with key rotation, fallback routes and a model search
