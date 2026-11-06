@@ -29,15 +29,18 @@ Then add a conversation agent and pick any model from the list. Personal AI 1.4 
 
 ## Install
 
-**Docker Compose** (any machine):
+**Docker Compose** (any machine). The stack includes its own Ollama, so models download and run with nothing else to set up:
 
 ```bash
 cd personal_ai_gateway
-cp .env.example .env        # keys, PROXY_API_KEY, OLLAMA_URL
-docker compose up -d --build
-# bundled Ollama too:  docker compose --profile bundled up -d --build   (OLLAMA_URL=http://ollama:11434)
+cp .env.example .env        # optional: API keys, PROXY_API_KEY
+docker compose up -d
 ```
-Open `http://<host>:8000`, sign in with the proxy key (or `ADMIN_PASSWORD`). Everything you add in the page is saved in `./data`.
+Open `http://<host>:8000`, sign in with the proxy key (shown in `docker compose logs gateway` and in Settings), then **Models → Find & download**. Models are stored in the `ollama_data` volume; the page's data in `./data`. Update with `docker compose pull && docker compose up -d` (or `up -d --build` if the image is private).
+
+- **NVIDIA GPU:** uncomment the `deploy` block under `ollama` (needs the NVIDIA container toolkit); downloads and speed then use the GPU.
+- **Your own Ollama instead:** set `OLLAMA_URL` in `.env` (or the address in Settings) and run `docker compose up -d --no-deps gateway`. An Ollama on the host must listen on the network (`OLLAMA_HOST=0.0.0.0`), or the gateway can't reach it from its container.
+- **Check downloads:** `docker compose logs -f ollama`.
 
 **Home Assistant add-on:** add the repository, install *Personal AI Gateway*, start it. **Ollama is built in**, so no other device is needed: open the add-on → Models → Find & download, pick a model, and it runs on this machine. (Settings → Ollama address should read `http://127.0.0.1:11434`; press *Use the built-in Ollama* if not.)
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.2
+
+- Docker Compose: Ollama is now part of the stack by default (no profile, no URL to set), the gateway waits for it to be healthy, and the Ollama address stays changeable in the page. Previously the gateway defaulted to an Ollama on the host that usually wasn't reachable, so downloads failed.
+- `.env` is optional; example file trimmed to what matters.
+
+## 1.1.1
+
+- Fixed downloads stuck at 99%: the built-in Ollama now writes straight to the add-on log (no pipe that could fill up and freeze it).
+- Stalled downloads are detected after 3 minutes and resumed automatically (up to 3 times); the page shows Ollama's current step and how long ago it last reported.
+- Checks free disk space before and during a download and stops with a clear message if there isn't enough. Free space is shown on the Installed tab.
+
 ## 1.1.0
 
 - **Built-in Ollama in the add-on** (CPU): no separate device needed. Starts with the add-on, models kept in `/data/ollama` and excluded from backups. Options: `builtin_ollama`, `ollama_keep_alive`; optional host port for `11434/tcp`.

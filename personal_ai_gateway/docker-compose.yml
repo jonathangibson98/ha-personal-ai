@@ -1,40 +1,54 @@
-# Personal AI Gateway, standalone.
-#   1. cp .env.example .env     (add your keys; set a PROXY_API_KEY)
-#   2. docker compose up -d --build
-#      Want Ollama bundled too?  docker compose --profile bundled up -d --build
-#      (and set OLLAMA_URL=http://ollama:11434 in .env)
-#   3. open http://<this-machine>:8000 and sign in with the proxy key
+# Personal AI Gateway + its own Ollama, as one stack. Nothing else to set up.
+#   1. cp .env.example .env     (optional: add API keys, set PROXY_API_KEY)
+#   2. docker compose up -d
+#   3. open http://<this-machine>:8000, sign in with the proxy key
+#      (printed in `docker compose logs gateway`, also in the page's Settings), then
+#      Models -> Find & download.
+# Update:  docker compose pull && docker compose up -d
+#   (if the pull is denied because the image is private, use: docker compose up -d --build)
 services:
   gateway:
     build:
       context: .
       dockerfile: Dockerfile.standalone
-    # Prebuilt by GitHub Actions on every push: `docker compose pull && docker compose up -d`
-    # Building locally instead: `docker compose up -d --build`
+    # Prebuilt by GitHub Actions on every push.
     image: ghcr.io/jonathangibson98/personal-ai-gateway:latest
     container_name: personal_ai_gateway
     restart: unless-stopped
     ports:
       - "8000:8000"
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     environment:
-      # Default points at an Ollama already running on this machine (any network mode).
-      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      # Where models are downloaded and run: the bundled Ollama below. You can change it
+      # in the page (Settings) or in .env with OLLAMA_URL to use an Ollama elsewhere.
+      OLLAMA_DEFAULT_URL: http://ollama:11434
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      ollama:
+        condition: service_healthy
     volumes:
       - ./data:/data   # providers, keys you add in the page, usage counters
 
-  # Optional: run Ollama itself as part of this stack (docker compose --profile bundled ...)
   ollama:
-    profiles: ["bundled"]
     image: ollama/ollama:latest
     container_name: gateway_ollama
     restart: unless-stopped
-    ports:
-      - "11434:11434"
+    environment:
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-5m}   # how long a model stays in memory after use
     volumes:
-      - ollama_data:/root/.ollama
+      - ollama_data:/root/.ollama   # downloaded models live here
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    # Reach Ollama directly from other machines or apps: uncomment (it has no password).
+    # ports:
+    #   - "11434:11434"
     # NVIDIA GPU (needs the NVIDIA container toolkit): uncomment
     # deploy:
     #   resources:
