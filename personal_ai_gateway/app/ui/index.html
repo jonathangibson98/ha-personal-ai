@@ -284,6 +284,7 @@ label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
   async function installed(body) {
     if (!S.ollama.ok) return;
     const { models: list } = await api('models/installed');
+    if (S.disk_free != null) body.append(h('p', { class: 'muted' }, 'Free disk space for models: ' + mb(S.disk_free)));
     body.append(list.length ? list.map(m => h('div', { class: 'card' },
       h('div', { class: 'row sp' }, h('h3', {}, lamp(m.loaded ? 'ready' : 'off'), h('span', { class: 'mono' }, m.name)),
         h('span', { class: 'muted' }, m.size_h)),
@@ -347,7 +348,8 @@ label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
         return h('div', { class: 'card' },
           h('div', { class: 'row sp' }, h('span', { class: 'mono' }, j.name), h('span', { class: j.status === 'error' ? 'err' : j.status === 'done' ? 'ok' : 'muted' }, j.status)),
           meter(pct),
-          h('div', { class: 'row sp muted' }, h('span', {}, j.total ? `${mb(j.completed)} of ${mb(j.total)}` : j.message), h('span', {}, j.total ? Math.round(pct) + '%' : '')),
+          h('div', { class: 'row sp muted' }, h('span', {}, j.total ? `${mb(j.completed)} of ${mb(j.total)}` : j.message), h('span', {}, j.total ? (pct >= 99.5 && pct < 100 ? '99%' : Math.round(pct) + '%') : '')),
+          j.status === 'pulling' && j.total ? h('div', { class: 'muted' }, 'Step: ' + (j.message || '…') + ' · last news ' + ago(j.updated) + ' ago') : null,
           j.status === 'error' ? h('p', { class: 'err' }, j.message) : null,
           ['queued', 'pulling'].includes(j.status) ? h('button', { class: 'b d', type: 'button', onclick: act(async () => { await api(`jobs/${j.id}/cancel`, { method: 'POST' }); draw(); }) }, 'Cancel') : null);
       }) : [h('p', { class: 'muted' }, 'No downloads yet.')]));
