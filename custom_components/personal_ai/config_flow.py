@@ -159,6 +159,24 @@ class PersonalAiSubentryFlowHandler(ConfigSubentryFlow):
         matches = re.search(r"([^/]*)\.gguf$", model_name.strip())
         return matches[1] if matches else model_name
 
+    def _get_client(self) -> AsyncOpenAI:
+        """Return the entry's client, or a temporary one if the entry isn't loaded.
+
+        ``entry.runtime_data`` only exists after ``async_setup_entry`` has
+        succeeded. If the server was unreachable at startup (setup retry) or the
+        entry is mid-reload, it is missing, so build a throwaway client from the
+        stored connection settings instead.
+        """
+        entry = self._get_entry()
+        client = getattr(entry, "runtime_data", None)
+        if client is not None:
+            return client
+        return AsyncOpenAI(
+            base_url=entry.data[PersonalAiConfigKey.BASE_URL],
+            api_key=entry.data.get(CONF_API_KEY) or "",
+            http_client=get_async_client(self.hass),
+        )
+
 
 class ConversationFlowHandler(PersonalAiSubentryFlowHandler):
     """Handle subentry flow."""
@@ -193,7 +211,7 @@ class ConversationFlowHandler(PersonalAiSubentryFlowHandler):
         if options is None:
             options = {}
         llm_apis = self.get_llm_apis()
-        client = self._get_entry().runtime_data
+        client = self._get_client()
 
         try:
             response = await client.with_options(timeout=TIMEOUT).models.list()
@@ -407,7 +425,7 @@ class AITaskDataFlowHandler(PersonalAiSubentryFlowHandler):
         if options is None:
             options = {}
         try:
-            client = self._get_entry().runtime_data
+            client = self._get_client()
             response = await client.with_options(timeout=TIMEOUT).models.list()
             downloaded_models: list[SelectOptionDict] = [
                 SelectOptionDict(
@@ -554,7 +572,7 @@ class AIImageFlowHandler(PersonalAiSubentryFlowHandler):
         if options is None:
             options = {}
         try:
-            client = self._get_entry().runtime_data
+            client = self._get_client()
             response = await client.with_options(timeout=TIMEOUT).models.list()
             available_models: list[SelectOptionDict] = [
                 SelectOptionDict(label=model.id, value=model.id) for model in response.data
@@ -697,7 +715,7 @@ class SpeechFlowBase(PersonalAiSubentryFlowHandler):
     async def _async_models(self) -> list[SelectOptionDict]:
         """List the models the server offers (empty if it can't say)."""
         try:
-            client = self._get_entry().runtime_data
+            client = self._get_client()
             response = await client.with_options(timeout=TIMEOUT).models.list()
             return [SelectOptionDict(label=model.id, value=model.id) for model in response.data]
         except OpenAIError as err:
