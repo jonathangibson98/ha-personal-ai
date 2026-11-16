@@ -358,6 +358,178 @@
           "description": "Which Personal AI server (a Personal AI Gateway). Optional if you have only one."
         }
       }
+    },
+    "add_api_key": {
+      "name": "Add API key",
+      "description": "Adds an API key to a provider on a Personal AI Gateway, creating the provider if needed (ready-made names like openai, gemini, groq, openrouter need no base_url).",
+      "fields": {
+        "provider": {
+          "name": "Provider",
+          "description": "Provider name, for example groq or gemini."
+        },
+        "key": {
+          "name": "API key",
+          "description": "The key to add."
+        },
+        "base_url": {
+          "name": "Base URL",
+          "description": "Only for a new provider that isn't ready-made."
+        },
+        "config_entry": {
+          "name": "Server",
+          "description": "Which Personal AI server (a Personal AI Gateway). Optional if you have only one."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "admin": {
+        "title": "Gateway admin password",
+        "description": "This gateway has its own admin password (ADMIN_PASSWORD), different from the API key. Enter it once so Home Assistant can manage the gateway.",
+        "data": {
+          "gateway_admin_password": "Admin password"
+        }
+      },
+      "menu": {
+        "title": "Personal AI Gateway {version}",
+        "description": "Running as: {where}\nProviders: {providers}",
+        "menu_options": {
+          "providers": "Providers and API keys",
+          "accounts": "Sign in with Claude, ChatGPT or Gemini (no API key)",
+          "devices": "Devices: MCP servers for the devices you choose",
+          "download_model": "Download a local model (Ollama)"
+        }
+      },
+      "providers": {
+        "title": "Providers and API keys",
+        "menu_options": {
+          "add_preset": "Add a ready-made provider (OpenAI, Gemini, Groq…)",
+          "add_custom": "Add another OpenAI-compatible server",
+          "add_key": "Add another API key to a provider",
+          "remove_provider": "Remove a provider"
+        }
+      },
+      "add_preset": {
+        "title": "Add a provider",
+        "data": {
+          "preset": "Provider",
+          "key": "API key"
+        }
+      },
+      "add_custom": {
+        "title": "Add an OpenAI-compatible server",
+        "description": "The name becomes the model prefix (name/model).",
+        "data": {
+          "name": "Name",
+          "base_url": "Base URL (ends in /v1)",
+          "key": "API key (optional)"
+        }
+      },
+      "add_key": {
+        "title": "Add an API key",
+        "description": "The gateway rotates between a provider's keys and skips ones that hit a limit.",
+        "data": {
+          "provider": "Provider",
+          "key": "API key"
+        }
+      },
+      "remove_provider": {
+        "title": "Remove a provider",
+        "data": {
+          "provider": "Provider"
+        }
+      },
+      "accounts": {
+        "title": "Sign in with an account",
+        "description": "Uses the company's own official tool on the gateway's device. Answers count against your plan's normal limits.",
+        "data": {
+          "account": "Account"
+        }
+      },
+      "account": {
+        "title": "{account}",
+        "description": "Status: {status}\nModel names: {models}",
+        "menu_options": {
+          "account_install": "Install or update",
+          "account_login": "Sign in",
+          "account_logout": "Sign out",
+          "account_provider": "Add to providers"
+        }
+      },
+      "account_login": {
+        "title": "Sign in",
+        "description": "1. {link} and sign in.\n2. Copy the code it shows and paste it below, then press Submit. (ChatGPT instead shows a code in the window below to type on its page: do that, then press Submit with the box empty.)\n\n{output}",
+        "data": {
+          "code": "Code from the sign-in page"
+        }
+      },
+      "devices": {
+        "title": "Devices (MCP servers)",
+        "description": "MCP servers let AI apps see or control only the devices you pick.\nYour servers: {servers}",
+        "menu_options": {
+          "new_server": "Make a new MCP server",
+          "edit_server": "Change a server's devices",
+          "ai_server": "Device access for the signed-in accounts",
+          "ha_link": "Connect the gateway to this Home Assistant"
+        }
+      },
+      "ha_link": {
+        "title": "Connect the gateway to Home Assistant",
+        "description": "The Docker gateway needs a way into Home Assistant to show your devices. Create a long-lived access token (your profile > Security > Long-lived access tokens) and paste it here. Use an address the gateway's device can reach.",
+        "data": {
+          "ha_url": "Home Assistant address",
+          "ha_token": "Long-lived access token"
+        }
+      },
+      "new_server": {
+        "title": "New MCP server",
+        "data": {
+          "name": "Name (for example Living room, Lights only)"
+        }
+      },
+      "edit_server": {
+        "title": "Change a server",
+        "data": {
+          "server": "MCP server"
+        }
+      },
+      "server_devices": {
+        "title": "Devices for {name}",
+        "description": "A device's choice covers all its entities. Anything not picked stays hidden.",
+        "data": {
+          "name": "Name",
+          "enabled": "Turned on",
+          "control_devices": "Devices it can see and control",
+          "see_devices": "Devices it can only see",
+          "control_entities": "Single entities it can see and control",
+          "see_entities": "Single entities it can only see"
+        }
+      },
+      "ai_server": {
+        "title": "Device access for signed-in accounts",
+        "description": "Which MCP server the Claude, ChatGPT and Gemini accounts may use when you chat with them.",
+        "data": {
+          "server": "MCP server"
+        }
+      },
+      "download_model": {
+        "title": "Download a local model",
+        "description": "Downloads into the gateway's Ollama, for example llama3.2:3b or qwen3:4b. Small models suit a Raspberry Pi.",
+        "data": {
+          "model": "Model name"
+        }
+      }
+    },
+    "progress": {
+      "installing": "Installing the official tool on the gateway. This takes about a minute."
+    },
+    "error": {
+      "bad_admin": "Wrong admin password"
+    },
+    "abort": {
+      "not_gateway": "This server isn't a Personal AI Gateway, so there's nothing to manage here. (The gateway shows up at its address + /health.)",
+      "message": "{message}"
     }
   }
 }

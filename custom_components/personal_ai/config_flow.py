@@ -18,6 +18,7 @@ from homeassistant.config_entries import (
     ConfigFlow,
     ConfigFlowResult,
     ConfigSubentryFlow,
+    OptionsFlow,
     SubentryFlowResult,
 )
 from homeassistant.const import (
@@ -74,6 +75,7 @@ from .const import (
     PersonalAiConfigKey,
     PersonalAiSubentryType,
 )
+from .gateway_flow import GatewayOptionsFlow
 from .image_storage import default_save_path, is_path_allowed
 from .speech import EMOTION_NAMES, async_fetch_voices
 
@@ -96,6 +98,12 @@ class PersonalAiConfigFlow(ConfigFlow, domain=DOMAIN):
             PersonalAiSubentryType.AI_TTS: AITTSFlowHandler,
             PersonalAiSubentryType.AI_STT: AISTTFlowHandler,
         }
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        """Configure: manage a Personal AI Gateway behind this server."""
+        return GatewayOptionsFlow()
 
     async def async_step_user(
         self, user_input: dict[str, object] | None = None

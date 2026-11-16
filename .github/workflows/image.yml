@@ -259,5 +259,41 @@ jobs:
           build-args: ${{ steps.args.outputs.build_args }}
           tags: ${{ steps.meta_docker.outputs.tags || steps.meta_addon.outputs.tags }}
           labels: ${{ steps.meta_docker.outputs.labels || steps.meta_addon.outputs.labels }}
+          # Reuse unchanged layers from the last build (much faster, especially the arm64 ones).
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  verify:
+    name: Check every image can be pulled
+    needs: [discover, build]
+    if: always() && needs.discover.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull-test each image without signing in
+        env:
+          MATRIX: ${{ needs.discover.outputs.matrix }}
+        run: |
+          set -uo pipefail
+          export DOCKER_CONFIG="$(mktemp -d)"   # no saved login: test it the way Home Assistant / docker pull sees it
+          fail=0
+          while IFS=$'\t' read -r kind image version platforms; do
+            tag="latest"; [ "$kind" = addon ] && tag="$version"
+            if ! out="$(docker buildx imagetools inspect "$image:$tag" 2>&1)"; then
+              if grep -qiE "unauthorized|denied|401|403" <<<"$out"; then
+                echo "::error title=$image is private::Home Assistant and docker pull can't download it. Open github.com/${{ github.repository_owner }}?tab=packages > this package > Package settings > Change visibility > Public."
+              else
+                echo "::error title=$image:$tag missing::$out"
+              fi
+              fail=1; continue
+            fi
+            for p in ${platforms//,/ }; do
+              if [ "$kind" = docker ] && ! grep -q "Platform: *$p" <<<"$out"; then
+                echo "::error title=$image missing $p::The multi-arch image has no $p build."; fail=1
+              fi
+            done
+            echo "OK  $image:$tag  ($platforms)"
+          done < <(jq -r '.include[] | [.kind, .image, .version, .platforms] | @tsv' <<<"$MATRIX")
+          exit $fail
+          labels: ${{ steps.meta_docker.outputs.labels || steps.meta_addon.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}

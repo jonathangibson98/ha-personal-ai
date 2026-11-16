@@ -25,3 +25,24 @@ pull_model:
       selector:
         config_entry:
           integration: personal_ai
+add_api_key:
+  fields:
+    provider:
+      required: true
+      example: groq
+      selector:
+        text:
+    key:
+      required: true
+      selector:
+        text:
+          type: password
+    base_url:
+      example: https://api.example.com/v1
+      selector:
+        text:
+          type: url
+    config_entry:
+      selector:
+        config_entry:
+          integration: personal_ai

@@ -139,6 +139,19 @@ The `personal_ai_gateway/` folder is a companion server (Docker Compose or Home 
 
 Point a Personal AI server at `http://<host>:8000/v1` with the gateway's proxy key. New actions `personal_ai.search_models` and `personal_ai.pull_model` search and download models from Home Assistant. See `personal_ai_gateway/DOCS.md`.
 
+### Manage the gateway from Home Assistant
+
+The gateway can be the add-on or the Docker version on any other device: Home Assistant manages it through the server's own address. Settings > Devices & services > Personal AI > your gateway server > **Configure**:
+
+- **Providers and API keys:** add a ready-made provider (OpenAI, Gemini, Groq, OpenRouter...) or any OpenAI-compatible server, add more keys for rotation, remove providers.
+- **Sign in with Claude, ChatGPT or Gemini:** install the official tool on the gateway, then sign in: open the link, paste the code. No API key.
+- **Devices:** make MCP servers and pick, with Home Assistant's own device and entity pickers, what each can see or control. Shows the MCP address when you save. Also: which device list the signed-in accounts may use, and (Docker only) connecting the gateway to this Home Assistant with a long-lived token.
+- **Download a local model** into the gateway's Ollama.
+
+If the gateway has its own `ADMIN_PASSWORD`, Configure asks for it once. Action `personal_ai.add_api_key` adds a key (or a new provider) from scripts and automations.
+
+Images are built by GitHub Actions on every push: the add-on for `amd64` and `aarch64` (Home Assistant picks the right one), and the Docker image `ghcr.io/jonathangibson98/personal-ai-gateway` as one multi-arch image (`amd64` + `arm64`, so `docker compose pull` gets the right one on a PC or a 64-bit Pi).
+
 ## Troubleshooting
 
 - **Logo missing:** needs HA 2026.3+. Restart Home Assistant and hard-refresh the browser, since brand images are cached.
