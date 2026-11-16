@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.0
+
+- **Sign in with an account, no API key.** Providers → *Sign in with an account*: install the official Claude Code, Codex (ChatGPT) or Gemini CLI tool with one button, sign in from the page (open the link, paste the code), and use `claude-account/sonnet`, `chatgpt-account/default`, `gemini-account/gemini-2.5-pro`... like any other model, in Home Assistant too.
+- **Devices tab: MCP servers for the devices you choose.** Make one or more MCP servers, pick which devices or entities each can see or control, and paste its address into any MCP app. Tools: list devices, state, history, available actions, and controlling one allowed entity at a time.
+- The signed-in accounts can use one of those MCP servers, so Claude, ChatGPT or Gemini can control the devices you chose.
+- The account tools run as a separate user that can't read the gateway's keys.
+- The add-on now has Home Assistant API access (needed for Devices). Docker installs use `HA_URL` + `HA_TOKEN`.
+- Fixed the Chat tab not opening.
+
 ## 1.1.2
 
 - Docker Compose: Ollama is now part of the stack by default (no profile, no URL to set), the gateway waits for it to be healthy, and the Ollama address stays changeable in the page. Previously the gateway defaulted to an Ollama on the host that usually wasn't reachable, so downloads failed.

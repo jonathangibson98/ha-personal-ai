@@ -48,7 +48,7 @@ class Store:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         self.path = DATA_DIR / "gateway.json"
         self.options = load_addon_options()
-        self.data = {"proxy_key": "", "settings": {}, "providers": {}, "routes": {}}
+        self.data = {"proxy_key": "", "settings": {}, "providers": {}, "routes": {}, "mcp": {"servers": {}, "ai_server": ""}}
         if self.path.is_file():
             try:
                 self.data.update(json.loads(self.path.read_text()))
@@ -155,7 +155,7 @@ class Store:
         if not NAME_RE.fullmatch(name):
             raise ValueError("Name: lowercase letters, digits, - and _ (max 32).")
         kind = spec.get("kind", "openai")
-        if kind not in ("openai", "ollama", "http"):
+        if kind not in ("openai", "ollama", "http", "cli"):
             raise ValueError("Unknown provider kind.")
         cur = self.data["providers"].get(name, {})
         mode = spec.get("mode", cur.get("mode", ""))
@@ -171,6 +171,10 @@ class Store:
             p["base_url"] = url
         elif kind == "ollama":
             p["base_url"] = str(spec.get("base_url") or "").strip()
+        elif kind == "cli":
+            p["cli"] = cur.get("cli") or str(spec.get("cli") or "")
+            if not p["cli"]:
+                raise ValueError("Account providers are added from Providers > Sign in with an account.")
         else:
             r = spec.get("recipe") or {}
             if not str(r.get("url", "")).startswith(("http://", "https://")):
@@ -217,6 +221,12 @@ class Store:
                 clean[k] = chain
         self.data["routes"] = clean
         self.save()
+
+    def mcp_ai_key(self) -> str:
+        """Key of the MCP server the signed-in AIs may use, or '' for none."""
+        m = self.data.get("mcp") or {}
+        srv = (m.get("servers") or {}).get(m.get("ai_server") or "")
+        return srv["key"] if srv and srv.get("enabled", True) else ""
 
     def regenerate_proxy_key(self) -> str:
         self.data["proxy_key"] = secrets.token_urlsafe(24)

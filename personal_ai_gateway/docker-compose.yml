@@ -24,6 +24,10 @@ services:
       # Where models are downloaded and run: the bundled Ollama below. You can change it
       # in the page (Settings) or in .env with OLLAMA_URL to use an Ollama elsewhere.
       OLLAMA_DEFAULT_URL: http://ollama:11434
+      # Devices tab (MCP servers for your Home Assistant devices): your HA address and a
+      # long-lived access token (HA profile > Security). You can also type them in the page.
+      # HA_URL: http://homeassistant.local:8123
+      # HA_TOKEN: your-long-lived-token
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

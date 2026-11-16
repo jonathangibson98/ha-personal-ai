@@ -17,12 +17,14 @@ from pathlib import Path
 
 from aiohttp import ClientSession, ClientTimeout, FormData, web
 
+from accounts import ACCOUNTS, Accounts
 from hub import Hub, OllamaError, run_bundled
+from mcp import HA, Devices, HAError
 from rotator import KeyPool, kid
 from store import DATA_DIR, PRESETS, Store
 from upstream import Gateway, err, sanitize
 
-VERSION = "1.1.2"
+VERSION = "1.7.0"
 TEST_MODELS = {"gemini": "gemini-2.5-flash", "openai": "gpt-4o-mini", "groq": "llama-3.3-70b-versatile",
                "mistral": "mistral-small-latest", "deepseek": "deepseek-chat", "cerebras": "llama3.1-8b"}
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -34,6 +36,8 @@ STORE: Store
 POOL: KeyPool
 GW: Gateway
 HUB: Hub
+ACC: Accounts
+DEV: Devices
 START = time.time()
 
 
@@ -71,7 +75,7 @@ async def middleware(request, handler):
         return await handler(request)
     except web.HTTPException:
         raise
-    except (OllamaError, ValueError, KeyError) as e:
+    except (OllamaError, HAError, ValueError, KeyError) as e:
         return web.json_response({"error": str(e) or type(e).__name__}, status=400)
     except Exception as e:  # noqa: BLE001
         log.exception("Unhandled error")
@@ -142,7 +146,7 @@ async def api_state(request):
     for name, p in STORE.providers().items():
         saved = set(p.get("keys") or [])
         providers[name] = {
-            "kind": p["kind"], "enabled": p.get("enabled", True), "mode": p.get("mode", ""),
+            "kind": p["kind"], "cli": p.get("cli", ""), "enabled": p.get("enabled", True), "mode": p.get("mode", ""),
             "base_url": p.get("base_url") or "",
             "recipe": p.get("recipe"), "ignore": p.get("ignore", []), "whitelist": p.get("whitelist", []),
             "keys": [{**POOL.info(name, k), "source": "saved" if k in saved else "env"} for k in STORE.keys(name)],
@@ -302,6 +306,95 @@ async def api_job_cancel(request):
     return web.json_response({"ok": HUB.cancel(request.match_info["id"])})
 
 
+# -- sign in with an account
+def _acct(request) -> str:
+    a = request.match_info["acct"]
+    if a not in ACCOUNTS:
+        raise ValueError("Unknown account type.")
+    return a
+
+
+async def api_accounts(request):
+    return web.json_response({"accounts": await ACC.status(), "sessions": [s.view() for s in ACC.sessions.values()
+                                                                          if s.status == "running"]})
+
+
+async def api_account_install(request):
+    return web.json_response((await ACC.install(_acct(request))).view())
+
+
+async def api_account_login(request):
+    return web.json_response((await ACC.login(_acct(request))).view())
+
+
+async def api_account_logout(request):
+    await ACC.logout(_acct(request))
+    return web.json_response({"ok": True})
+
+
+async def api_account_provider(request):
+    ACC.add_provider(_acct(request))
+    return web.json_response({"ok": True})
+
+
+async def api_session(request):
+    s = ACC.sessions.get(request.match_info["sid"])
+    if not s:
+        raise ValueError("That window is gone. Start again.")
+    return web.json_response(s.view())
+
+
+async def api_session_input(request):
+    s = ACC.sessions.get(request.match_info["sid"])
+    if not s:
+        raise ValueError("That window is gone. Start again.")
+    s.send(str((await request.json()).get("text", "")))
+    return web.json_response(s.view())
+
+
+async def api_session_cancel(request):
+    s = ACC.sessions.get(request.match_info["sid"])
+    if s:
+        s.kill()
+    return web.json_response({"ok": True})
+
+
+# -- devices (MCP servers)
+async def api_mcp(request):
+    servers = list(DEV.servers().values())
+    return web.json_response({
+        "servers": servers, "ai_server": DEV.cfg["ai_server"], "ha_connected": DEV.ha.configured(),
+        "ha_locked": DEV.ha.locked(), "ha_url": "" if DEV.ha.locked() else DEV.cfg.get("ha_url", ""),
+        "ha_token_set": bool(DEV.cfg.get("ha_token")), "calls": DEV.calls[:15], "port": int(os.environ.get("PORT", "8000"))})
+
+
+async def api_mcp_save(request):
+    srv = DEV.save_server(await request.json())
+    return web.json_response(srv)
+
+
+async def api_mcp_delete(request):
+    DEV.delete(request.match_info["sid"])
+    return web.json_response({"ok": True})
+
+
+async def api_mcp_regen(request):
+    return web.json_response(DEV.regenerate(request.match_info["sid"]))
+
+
+async def api_mcp_settings(request):
+    DEV.set_settings(await request.json())
+    return web.json_response({"ok": True})
+
+
+async def api_mcp_catalog(request):
+    return web.json_response(await DEV.catalog())
+
+
+async def mcp_endpoint(request):
+    return await DEV.handle(request)
+
+
 async def index(request):
     return web.FileResponse(APP_DIR / "ui" / "index.html", headers={"Cache-Control": "no-store"})
 
@@ -328,11 +421,15 @@ async def background(app):
 
 
 async def make_app() -> web.Application:
-    global STORE, POOL, GW, HUB
+    global STORE, POOL, GW, HUB, ACC, DEV
     STORE = Store()
     POOL = KeyPool(DATA_DIR / "usage.json", STORE.setting("cooldowns"))
     session = ClientSession(timeout=ClientTimeout(total=None))
     GW, HUB = Gateway(STORE, POOL, session), Hub(STORE, session)
+    ACC = Accounts(STORE, int(os.environ.get("PORT", "8000")))
+    GW.accounts = ACC
+    DEV = Devices(STORE, HA(STORE, session), on_change=ACC.configure_mcp)
+    ACC.configure_mcp()
     app = web.Application(middlewares=[middleware], client_max_size=64 * 1024 * 1024)
     app["session"] = session
     app.cleanup_ctx.append(background)
@@ -366,6 +463,22 @@ async def make_app() -> web.Application:
         web.get("/api/models/quants", api_quants),
         web.get("/api/jobs", api_jobs),
         web.post("/api/jobs/{id}/cancel", api_job_cancel),
+        web.get("/api/accounts", api_accounts),
+        web.post("/api/accounts/{acct}/install", api_account_install),
+        web.post("/api/accounts/{acct}/login", api_account_login),
+        web.post("/api/accounts/{acct}/logout", api_account_logout),
+        web.post("/api/accounts/{acct}/provider", api_account_provider),
+        web.get("/api/sessions/{sid}", api_session),
+        web.post("/api/sessions/{sid}/input", api_session_input),
+        web.post("/api/sessions/{sid}/cancel", api_session_cancel),
+        web.get("/api/mcp", api_mcp),
+        web.post("/api/mcp/servers", api_mcp_save),
+        web.delete("/api/mcp/servers/{sid}", api_mcp_delete),
+        web.post("/api/mcp/servers/{sid}/regenerate", api_mcp_regen),
+        web.put("/api/mcp/settings", api_mcp_settings),
+        web.get("/api/mcp/catalog", api_mcp_catalog),
+        web.route("*", "/mcp", mcp_endpoint),
+        web.route("*", "/mcp/{key}", mcp_endpoint),
     ])
     return app
 

@@ -133,6 +133,8 @@ The `personal_ai_gateway/` folder is a companion server (Docker Compose or Home 
 
 - several API keys per provider with **rotation, cooldowns and failover**, plus **fallback routes** (try Gemini, then Groq, then local),
 - **host the AI yourself**: manage Ollama, **search the Ollama library and Hugging Face**, download models with a progress meter,
+- **sign in with your Claude, ChatGPT or Gemini account** instead of an API key (uses each company's official CLI),
+- **MCP servers for the Home Assistant devices you choose**, each device hidden, read-only or controllable,
 - custom HTTP providers for services with their own endpoint, and a phone-friendly management page.
 
 Point a Personal AI server at `http://<host>:8000/v1` with the gateway's proxy key. New actions `personal_ai.search_models` and `personal_ai.pull_model` search and download models from Home Assistant. See `personal_ai_gateway/DOCS.md`.

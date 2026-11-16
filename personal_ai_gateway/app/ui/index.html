@@ -23,7 +23,7 @@ header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
 h1{font-size:1.1rem;margin:0;font-weight:700;letter-spacing:.01em}
 header small{color:var(--muted)}
 main{flex:1;overflow-y:auto;padding:4px 16px 24px;max-width:760px;width:100%;margin:0 auto}
-nav{display:grid;grid-template-columns:repeat(6,1fr);background:var(--panel);border-top:1px solid var(--line);
+nav{display:grid;grid-template-columns:repeat(7,1fr);background:var(--panel);border-top:1px solid var(--line);
   padding-bottom:env(safe-area-inset-bottom)}
 nav button{background:none;border:0;padding:11px 2px 10px;font:inherit;font-size:.78rem;color:var(--muted);cursor:pointer;border-top:3px solid transparent}
 nav button[aria-current=page]{color:var(--ink);border-top-color:var(--accent);font-weight:650}
@@ -59,6 +59,13 @@ label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
 .keyrow:first-of-type{border-top:0}
 .note{padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--cooling) 20%,var(--panel));font-size:.9rem;margin:10px 0}
 .err{color:var(--danger)}
+pre.term{background:#0d1114;color:#d8e0e0;border-radius:10px;padding:10px;font:12px/1.4 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow-y:auto;margin:8px 0}
+details.dev{border-top:1px solid var(--line);padding:6px 0}
+details.dev summary{cursor:pointer;display:flex;gap:8px;align-items:center;list-style:none}
+details.dev summary::-webkit-details-marker{display:none}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:none}
+.seg button{font:inherit;font-size:.78rem;border:0;background:var(--bg);color:var(--muted);padding:4px 8px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);font-weight:600}
 .ok{color:var(--ready)}
 #chatlog{display:flex;flex-direction:column;gap:8px;margin:8px 0}
 .m{padding:9px 12px;border-radius:14px;white-space:pre-wrap;overflow-wrap:anywhere;max-width:92%}
@@ -123,7 +130,7 @@ label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
   const lamp = s => h('span', { class: 'lamp ' + s, title: s });
   const field = (label, input) => [h('label', { class: 'f' }, label), input];
 
-  const TABS = [['overview', 'Overview'], ['providers', 'Providers'], ['models', 'Models'], ['routes', 'Routes'], ['chat', 'Chat'], ['settings', 'Settings']];
+  const TABS = [['overview', 'Overview'], ['providers', 'Providers'], ['models', 'Models'], ['routes', 'Routes'], ['devices', 'Devices'], ['chat', 'Chat'], ['settings', 'Settings']];
   function drawNav() {
     $('#nav').replaceChildren(...TABS.map(([id, label]) =>
       h('button', { type: 'button', 'aria-current': id === tab ? 'page' : null, onclick: () => { tab = id; show(); } }, label)));
@@ -136,7 +143,7 @@ label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
     $('#ver').textContent = 'v' + S.version;
     const root = h('div');
     $('#main').replaceChildren(root);
-    await ({ overview, providers, models, routes, chatTab, settings }[tab])(root);
+    await ({ overview, providers, models, routes, devices, chat: chatTab, settings }[tab])(root);
   }
   const refreshEvery = (ms, fn) => { clearInterval(timer); timer = setInterval(fn, ms); };
 
@@ -184,7 +191,10 @@ label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
     const form = h('div');
     const redraw = () => show();
     const list = Object.entries(S.providers).map(([name, p]) => providerCard(name, p, redraw));
-    root.append(
+    const acc = h('div');
+    root.append(acc);
+    accountsSection(acc);
+    root.append(h('h2', {}, 'Providers'),
       h('button', { class: 'b p', type: 'button', onclick: () => { form.hidden = !form.hidden; } }, 'Add provider'),
       form, ...list);
     form.hidden = true;
@@ -250,7 +260,8 @@ label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
         h('button', { class: 'b', type: 'button', onclick: act(async () => { await spec({ enabled: !p.enabled }); redraw(); }) }, p.enabled ? 'Disable' : 'Enable')),
       p.base_url ? h('div', { class: 'mono muted' }, p.base_url) : (p.kind === 'ollama' ? h('div', { class: 'muted' }, 'Uses the Ollama address from Settings') : null),
       p.recipe ? h('div', { class: 'mono muted' }, p.recipe.url) : null,
-      p.kind !== 'http' && !(p.kind === 'ollama') ? [
+      p.kind === 'cli' ? h('div', { class: 'muted' }, 'Signed in with your own account. Manage it under “Sign in with an account” above.') : null,
+      !['http', 'ollama', 'cli'].includes(p.kind) ? [
         h('div', { style: 'margin-top:8px' }, ...p.keys.map(k => h('div', { class: 'keyrow' },
           lamp(k.status), h('span', { class: 'mono grow' }, k.masked, k.source === 'env' ? ' (from settings)' : ''),
           h('span', { class: 'muted' }, k.status === 'ready' ? `${k.used} used · ${k.errors} errors` : k.status === 'locked' ? 'rejected by provider' : `resting ${k.cooldown_s}s`),
@@ -266,8 +277,155 @@ label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
         h('button', { class: 'b', type: 'button', onclick: act(async () => {
           const r = await api(`providers/${name}/models`); out.className = 'muted mono';
           out.textContent = (r.error ? 'Problem: ' + r.error + '\n\n' : '') + (r.models.length ? r.models.slice(0, 60).join('\n') + (r.models.length > 60 ? `\n…and ${r.models.length - 60} more` : '') : 'No models listed.'); out.className = r.error ? 'err mono' : 'muted mono'; out.style.whiteSpace = 'pre-wrap'; }) }, 'List models'),
-        name !== 'ollama' ? h('button', { class: 'b d', type: 'button', onclick: act(async () => { if (!confirm(`Remove ${name}?`)) return; await api('providers/' + name, { method: 'DELETE' }); redraw(); }) }, 'Remove') : null),
+        name !== 'ollama' ? h('button', { class: 'b d', type: 'button', onclick: act(async () => { if (!confirm(`Remove ${name}?` + (p.kind === 'cli' ? ' (You stay signed in; add it back from the account card.)' : ''))) return; await api('providers/' + name, { method: 'DELETE' }); redraw(); }) }, 'Remove') : null),
       out);
+  }
+
+  // ------------------------------------------------------------ sign in with an account
+  async function accountsSection(box) {
+    const { accounts, sessions } = await api('accounts');
+    const win = h('div');
+    box.replaceChildren(
+      h('h2', {}, 'Sign in with an account (no API key)'),
+      h('p', { class: 'muted' }, 'Use the plan you already pay for, or a free Google account. This installs the company’s own official tool here and you sign in once in your browser. Answers come from your plan’s limits.'),
+      ...accounts.map(a => h('div', { class: 'card' },
+        h('div', { class: 'row sp' },
+          h('h3', {}, lamp(a.signed_in ? 'ready' : a.installed ? 'cooling' : 'off'), a.label, h('span', { class: 'chip' }, a.signed_in ? 'signed in' : a.installed ? 'not signed in' : 'not installed')),
+          a.version ? h('span', { class: 'muted' }, 'v' + a.version) : null),
+        h('p', { class: 'muted', style: 'margin:0 0 6px' }, a.plan, a.signed_in ? ` · model names: ${a.models.map(m => a.provider + '/' + m).join(', ')}` : ''),
+        h('div', { class: 'row' },
+          h('button', { class: 'b' + (a.installed ? '' : ' p'), type: 'button', onclick: act(async () => { openSession(win, await api(`accounts/${a.id}/install`, { method: 'POST' }), () => accountsSection(box)); }) }, a.installed ? 'Update' : 'Install'),
+          a.installed ? h('button', { class: 'b' + (a.signed_in ? '' : ' p'), type: 'button', onclick: act(async () => { openSession(win, await api(`accounts/${a.id}/login`, { method: 'POST' }), () => accountsSection(box)); }) }, a.signed_in ? 'Sign in again' : 'Sign in') : null,
+          a.signed_in ? h('button', { class: 'b d', type: 'button', onclick: act(async () => { if (!confirm(`Sign out of ${a.label}?`)) return; await api(`accounts/${a.id}/logout`, { method: 'POST' }); accountsSection(box); }) }, 'Sign out') : null,
+          a.installed && !a.in_providers ? h('button', { class: 'b', type: 'button', onclick: act(async () => { await api(`accounts/${a.id}/provider`, { method: 'POST' }); show(); }) }, 'Add to providers') : null))),
+      win);
+    if (sessions[0]) openSession(win, sessions[0], () => accountsSection(box));
+  }
+
+  function openSession(win, sess, finished) {
+    const out = h('pre', { class: 'term' }), links = h('div', { class: 'row' }), st = h('span', { class: 'muted' });
+    const input = h('input', { placeholder: 'Paste the code here, or type an answer', autocomplete: 'off', autocapitalize: 'none' });
+    const send = act(async () => { if (!input.value) return; const v = await api(`sessions/${sess.id}/input`, { method: 'POST', json: { text: input.value } }); input.value = ''; paint(v); });
+    input.onkeydown = e => { if (e.key === 'Enter') send(); };
+    const enter = h('button', { class: 'b', type: 'button', title: 'Press Enter in the window', onclick: act(async () => paint(await api(`sessions/${sess.id}/input`, { method: 'POST', json: { text: '' } }))) }, 'Enter ⏎');
+    const cancel = h('button', { class: 'b d', type: 'button', onclick: act(async () => { await api(`sessions/${sess.id}/cancel`, { method: 'POST' }); }) }, 'Stop');
+    const close = h('button', { class: 'b', type: 'button', onclick: () => { win.replaceChildren(); finished(); } }, 'Close');
+    let poll = null;
+    const paint = v => {
+      const atEnd = out.scrollTop + out.clientHeight >= out.scrollHeight - 20;
+      out.textContent = v.output || '…';
+      if (atEnd) out.scrollTop = out.scrollHeight;
+      links.replaceChildren(...v.links.map(u => h('a', { class: 'b p', href: u, target: '_blank', rel: 'noopener' }, u.includes('device') || u.includes('code') ? 'Open sign-in page' : 'Open link')));
+      const running = v.status === 'running';
+      st.className = v.status === 'failed' ? 'err' : v.status === 'done' ? 'ok' : 'muted';
+      st.textContent = { running: 'Running…', done: 'Finished ✓', failed: `Stopped with an error (exit ${v.code}). Read the text above.`, cancelled: 'Stopped.' }[v.status];
+      input.disabled = enter.disabled = cancel.disabled = !running;
+      if (!running) { clearInterval(poll); finished(); }
+    };
+    win.replaceChildren(h('div', { class: 'card' }, h('h3', {}, sess.title), st, out, links,
+      h('div', { class: 'row', style: 'margin-top:8px' }, h('div', { class: 'grow' }, input), h('button', { class: 'b p', type: 'button', onclick: send }, 'Send'), enter),
+      h('p', { class: 'muted' }, 'Open the sign-in page, approve it, then copy the code it shows and paste it above. If it asks a question, type the answer (or just press Enter for the default).'),
+      h('div', { class: 'row' }, cancel, close)));
+    paint(sess);
+    poll = setInterval(async () => { try { paint(await api('sessions/' + sess.id)); } catch (e) { clearInterval(poll); } }, 1200);
+  }
+
+  // ------------------------------------------------------------ devices (MCP servers)
+  async function devices(root) {
+    const M = await api('mcp');
+    const base = sid => { const k = M.servers.find(s => s.id === sid)?.key || ''; return `${location.protocol}//${location.hostname}:${M.port}/mcp/${k}`; };
+    const aiSel = h('select', {}, [h('option', { value: '' }, 'No device access'), ...M.servers.map(s => h('option', { value: s.id, selected: s.id === M.ai_server }, s.name))]);
+    aiSel.onchange = act(async () => { await api('mcp/settings', { method: 'PUT', json: { ai_server: aiSel.value } }); toast('Saved'); });
+    const newName = h('input', { placeholder: 'Name, e.g. Living room, Everything, Guest' });
+    root.append(...[
+      h('p', { class: 'muted' }, 'Make an MCP server that can only see the devices you pick. Paste its address into any AI app that supports MCP (Claude, ChatGPT, Gemini CLI, Cursor…). Each device can be hidden, visible, or controllable.'),
+      !M.ha_connected ? haSetup(M) : null,
+      M.ha_connected && !M.ha_locked ? h('details', {}, h('summary', { class: 'muted' }, 'Home Assistant connection'), haSetup(M)) : null,
+      h('div', { class: 'card' }, h('h3', {}, 'Signed-in AIs'),
+        h('p', { class: 'muted' }, 'Which device list the Claude, ChatGPT and Gemini accounts signed in here may use when you chat with them (including through Home Assistant).'), aiSel),
+      ...M.servers.map(srv => serverCard(srv, base(srv.id), M)),
+      h('div', { class: 'card' }, h('h3', {}, 'New MCP server'), h('div', { class: 'row' }, h('div', { class: 'grow' }, newName),
+        h('button', { class: 'b p', type: 'button', disabled: !M.ha_connected, onclick: act(async () => { const srv = await api('mcp/servers', { method: 'POST', json: { name: newName.value || 'Devices' } }); openPicker = srv.id; show(); }) }, 'Create'))),
+      M.calls.length ? h('div', {}, h('h2', {}, 'Recent device actions'), h('div', { class: 'card' }, ...M.calls.map(c =>
+        h('div', { class: 'keyrow' }, h('span', { class: 'mono grow' }, `${c.action} → ${c.entity_id}`), h('span', { class: 'muted' }, `${c.server} · ${ago(c.t)} ago`))))) : null].filter(Boolean));
+  }
+  let openPicker = '';
+
+  function haSetup(M) {
+    if (M.ha_locked) return h('div', { class: 'note' }, 'Home Assistant isn’t answering. If this is the add-on, restart it after updating.');
+    const url = h('input', { value: M.ha_url, placeholder: 'http://homeassistant.local:8123' }), tok = h('input', { type: 'password', placeholder: M.ha_token_set ? '(saved, type to replace)' : 'Long-lived access token' });
+    return h('div', { class: 'card' }, h('h3', {}, 'Connect Home Assistant'),
+      h('p', { class: 'muted' }, 'Not needed in the add-on. For a plain Docker install: in Home Assistant open your profile > Security > Long-lived access tokens > Create token.'),
+      ...field('Home Assistant address', url), ...field('Access token', tok),
+      h('button', { class: 'b p', type: 'button', style: 'margin-top:8px', onclick: act(async () => { const j = { ha_url: url.value }; if (tok.value) j.ha_token = tok.value; await api('mcp/settings', { method: 'PUT', json: j }); toast('Saved'); show(); }) }, 'Save'));
+  }
+
+  function serverCard(srv, url, M) {
+    const shown = { v: false };
+    const urlBox = h('div', { class: 'mono' });
+    const paintUrl = () => urlBox.textContent = shown.v ? url : url.replace(srv.key, '••••••••');
+    paintUrl();
+    const picker = h('div');
+    const count = Object.keys(srv.devices).length + Object.keys(srv.entities).length;
+    const card = h('div', { class: 'card' },
+      h('div', { class: 'row sp' }, h('h3', {}, lamp(srv.enabled ? 'ready' : 'off'), srv.name, h('span', { class: 'chip' }, `${count} picked`), srv.id === M.ai_server ? h('span', { class: 'chip' }, 'used by signed-in AIs') : null),
+        h('button', { class: 'b', type: 'button', onclick: act(async () => { await api('mcp/servers', { method: 'POST', json: { id: srv.id, enabled: !srv.enabled } }); show(); }) }, srv.enabled ? 'Turn off' : 'Turn on')),
+      h('p', { class: 'muted', style: 'margin:4px 0' }, 'MCP address (keep it private, it works like a password):'), urlBox,
+      h('div', { class: 'row', style: 'margin-top:8px' },
+        h('button', { class: 'b', type: 'button', onclick: () => copy(url) }, 'Copy address'),
+        h('button', { class: 'b', type: 'button', onclick: () => { shown.v = !shown.v; paintUrl(); } }, 'Show'),
+        h('button', { class: 'b p', type: 'button', onclick: act(async () => { openPicker = openPicker === srv.id ? '' : srv.id; await drawPicker(); }) }, 'Choose devices'),
+        h('button', { class: 'b', type: 'button', onclick: act(async () => { if (!confirm('Make a new address? Apps using the old one stop working.')) return; await api(`mcp/servers/${srv.id}/regenerate`, { method: 'POST' }); show(); }) }, 'New address'),
+        h('button', { class: 'b d', type: 'button', onclick: act(async () => { if (!confirm(`Delete ${srv.name}?`)) return; await api('mcp/servers/' + srv.id, { method: 'DELETE' }); show(); }) }, 'Delete')),
+      picker);
+    async function drawPicker() {
+      if (openPicker !== srv.id) return picker.replaceChildren();
+      picker.replaceChildren(h('p', { class: 'muted' }, 'Loading your devices…'));
+      const cat = await api('mcp/catalog');
+      const dev = { ...srv.devices }, ent = { ...srv.entities };
+      const q = h('input', { type: 'search', placeholder: 'Search devices, rooms or entities' });
+      const onlyPicked = h('input', { type: 'checkbox' });
+      const list = h('div');
+      const seg = (cur, set) => {
+        const box = h('span', { class: 'seg' });
+        const draw = v => box.replaceChildren(...[['', 'Hidden'], ['read', 'Can see'], ['control', 'Can control']].map(([m, l]) =>
+          h('button', { type: 'button', 'aria-pressed': String((v || '') === m), onclick: e => { e.preventDefault(); e.stopPropagation(); set(m); draw(m); } }, l)));
+        draw(cur); return box;
+      };
+      const paint = () => {
+        const t = q.value.trim().toLowerCase();
+        const match = (...xs) => !t || xs.some(x => String(x || '').toLowerCase().includes(t));
+        const devs = cat.devices.filter(d => (!onlyPicked.checked || dev[d.id] || d.entities.some(e => ent[e.entity_id])) && match(d.name, d.area, d.model, ...d.entities.map(e => e.entity_id + ' ' + e.name)));
+        const loose = cat.entities.filter(e => (!onlyPicked.checked || ent[e.entity_id]) && match(e.entity_id, e.name)).slice(0, t || onlyPicked.checked ? 300 : 40);
+        let area = null; const rows = [];
+        for (const d of devs.slice(0, 400)) {
+          if (d.area !== area) { area = d.area; rows.push(h('h2', {}, area || 'No room')); }
+          rows.push(h('details', { class: 'dev' },
+            h('summary', {}, h('span', { class: 'grow' }, d.name, h('span', { class: 'muted' }, `  ${d.entities.length} entities${d.model ? ' · ' + d.model : ''}`)),
+              seg(dev[d.id], m => { if (m) dev[d.id] = m; else delete dev[d.id]; })),
+            h('div', { style: 'padding:4px 0 4px 14px' }, ...d.entities.map(e => h('div', { class: 'keyrow' },
+              h('span', { class: 'grow' }, e.name, ' ', h('span', { class: 'mono muted' }, e.entity_id), h('span', { class: 'muted' }, ' · ' + e.state)),
+              seg(ent[e.entity_id], m => { if (m) ent[e.entity_id] = m; else delete ent[e.entity_id]; })))),
+            h('p', { class: 'muted', style: 'margin:2px 0 0 14px' }, 'The device setting covers all its entities. An entity setting here overrides it.')));
+        }
+        if (loose.length) {
+          rows.push(h('h2', {}, 'Entities without a device'));
+          rows.push(...loose.map(e => h('div', { class: 'keyrow' }, h('span', { class: 'grow' }, e.name, ' ', h('span', { class: 'mono muted' }, e.entity_id)),
+            seg(ent[e.entity_id], m => { if (m) ent[e.entity_id] = m; else delete ent[e.entity_id]; }))));
+          if (!t && !onlyPicked.checked && cat.entities.length > 40) rows.push(h('p', { class: 'muted' }, `Showing 40 of ${cat.entities.length}. Search to find others.`));
+        }
+        list.replaceChildren(...(rows.length ? rows : [h('p', { class: 'muted' }, 'Nothing matches.')]));
+      };
+      q.oninput = paint; onlyPicked.onchange = paint;
+      picker.replaceChildren(h('div', { style: 'margin-top:10px' }, q,
+        h('label', { class: 'row muted', style: 'margin:8px 0' }, onlyPicked, 'Only show what’s picked'), list,
+        h('div', { class: 'row', style: 'position:sticky;bottom:0;background:var(--panel);padding:8px 0' },
+          h('button', { class: 'b p', type: 'button', onclick: act(async () => { await api('mcp/servers', { method: 'POST', json: { id: srv.id, devices: dev, entities: ent } }); openPicker = ''; toast('Saved'); show(); }) }, 'Save devices'),
+          h('button', { class: 'b', type: 'button', onclick: () => { openPicker = ''; picker.replaceChildren(); } }, 'Cancel'))));
+      paint();
+    }
+    drawPicker().catch(e => toast(e.message, true));
+    return card;
   }
 
   // ------------------------------------------------------------ models (host your own AI)

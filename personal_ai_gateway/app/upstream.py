@@ -119,6 +119,7 @@ class Gateway:
         self._models: dict[str, tuple[float, list[str]]] = {}
         self.recent = collections.deque(maxlen=60)
         self.list_errors: dict[str, str] = {}
+        self.accounts = None  # set by server.py: runs the signed-in account tools
 
     # -- model listing / resolving
     def _headers(self, key: str) -> dict:
@@ -135,6 +136,8 @@ class Gateway:
         last = ""
         if prov["kind"] == "http":
             ids = list(prov["recipe"].get("models") or [name])
+        elif prov["kind"] == "cli":
+            ids = self.accounts.models(prov["cli"]) if self.accounts else []
         else:
             keys = self.store.keys(name) or ([""] if prov["kind"] == "ollama" else [])
             if not keys:
@@ -204,6 +207,19 @@ class Gateway:
 
         for pname, umodel in chain:
             prov = self.store.providers()[pname]
+            if prov["kind"] == "cli":
+                if path != "/chat/completions":
+                    problems.append(f"{pname}: signed-in accounts only do chat")
+                    continue
+                body = build(umodel, pname, "cli")["json"]
+                try:
+                    text = await self.accounts.chat(prov["cli"], umodel, body, timeout)
+                except Exception as e:  # noqa: BLE001 - CliError, OSError ...
+                    problems.append(f"{pname}: {e}")
+                    self.note(model=f"{pname}/{umodel}", provider=pname, key="account", status=502, ms=int((time.time() - t0) * 1000))
+                    continue
+                self.note(model=f"{pname}/{umodel}", provider=pname, key="account", status=200, ms=int((time.time() - t0) * 1000))
+                return await self.text_reply(request, umodel, text, stream)
             if prov["kind"] == "http":
                 if path != "/chat/completions":
                     problems.append(f"{pname}: custom HTTP providers only do chat")
@@ -311,6 +327,16 @@ class Gateway:
         self.note(model=label, provider=pname, key=kid(key), status=200 if ok else 502, ms=ms())
         await out.write_eof()
         return out
+
+    async def text_reply(self, request, model: str, text: str, stream: bool):
+        if stream and request is not None:
+            cid = "chatcmpl-" + uuid.uuid4().hex[:24]
+            out = web.StreamResponse(status=200, headers={"Content-Type": "text/event-stream", "Cache-Control": "no-cache"})
+            await out.prepare(request)
+            await out.write(chunk(model, cid, text) + chunk(model, cid, None, done=True) + b"data: [DONE]\n\n")
+            await out.write_eof()
+            return out
+        return web.json_response(completion(model, text))
 
     # -- generic HTTP "recipe" provider
     async def http_provider(self, request, pname, prov, umodel, body, stream):

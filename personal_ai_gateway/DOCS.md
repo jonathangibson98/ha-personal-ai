@@ -1,6 +1,6 @@
 # Personal AI Gateway
 
-One OpenAI-compatible address for every AI you use: your cloud keys **and** models you download and run yourself.
+One OpenAI-compatible address for every AI you use: your cloud keys, **your Claude / ChatGPT / Gemini accounts (no API key)**, and models you download and run yourself. Plus **MCP servers** that let AI apps see and control only the Home Assistant devices you pick.
 
 ```
 apps (Personal AI in Home Assistant, SillyTavern, Open WebUI...) → Gateway → Gemini / OpenAI / Groq / OpenRouter ... / your Ollama
@@ -15,6 +15,45 @@ apps (Personal AI in Home Assistant, SillyTavern, Open WebUI...) → Gateway →
 - Endpoints: `/v1/chat/completions` (streaming, tools), `/v1/embeddings`, `/v1/images/generations`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/models`.
 
 Models are named `provider/model` (`gemini/gemini-2.0-flash`, `ollama/llama3.1:8b`), or by route name. Local Ollama models also work by bare name.
+
+## Sign in with an account (no API key)
+
+Providers → **Sign in with an account**. Each one uses that company's own official command-line tool, installed here when you press **Install**:
+
+| Account | Tool | What you need |
+|---|---|---|
+| Claude | Claude Code | a Claude Pro or Max plan |
+| ChatGPT | Codex | a ChatGPT Plus, Pro or Team plan |
+| Gemini | Gemini CLI | any Google account (free tier) |
+
+1. Press **Install** and wait for *Finished ✓* (about a minute; the tools live in the add-on's data, not in backups).
+2. Press **Sign in**. A small window opens: press **Open sign-in page**, sign in and approve, copy the code the page shows you, paste it into the box and press **Send**. (ChatGPT shows a short code to type on its page instead.) Done: the window says *Finished ✓*.
+3. The account is now a provider with models such as `claude-account/sonnet`, `claude-account/opus`, `claude-account/haiku`, `chatgpt-account/default`, `gemini-account/gemini-2.5-pro`. Use them in Home Assistant, in the Chat tab, or in a route like any other model.
+
+Good to know:
+
+- Answers count against your plan's normal usage limits, the same as using the app. Use it for yourself, under each company's terms.
+- These models answer with text. Home Assistant's own "control devices" tools aren't passed through; instead pick an MCP server under **Devices → Signed-in AIs** and the account can see and control exactly those devices.
+- Each request starts the tool once, so expect a few seconds more than an API key. At most 2 run at once (`CLI_CONCURRENCY` to change).
+- **Update** gets the newest version of the tool. **Sign out** forgets the sign-in.
+- The tools run as a separate user that can't read the gateway's keys or settings.
+
+## Devices: MCP servers for the devices you choose
+
+MCP is the standard way AI apps connect to tools. The **Devices** tab makes MCP servers that only expose the Home Assistant devices you pick:
+
+1. Type a name (e.g. *Living room*) and press **Create**.
+2. For every device (or single entity) choose **Hidden**, **Can see** or **Can control**. A device's choice covers all its entities; set an entity on its own to override it. Press **Save devices**.
+3. **Copy address** and paste it into an app that supports MCP, as a "Streamable HTTP" server. The address contains the server's private key, so treat it like a password; **New address** replaces it.
+
+Make as many as you like, e.g. *Everything* for yourself and *Lights only* for something else. **Turn off** stops one without deleting it.
+
+Tools the AI gets: `list_devices`, `get_state`, `get_history` (up to 7 days), `list_actions`, and `call_action` (only for *Can control*, and only on that one entity; it can't aim an action at other devices or areas). The last device actions are listed at the bottom of the tab.
+
+- **Signed-in AIs:** pick a server here and the Claude, ChatGPT and Gemini accounts use it automatically, including when you talk to them through Home Assistant.
+- **From another app on your network:** use the address as shown (`http://<home-assistant-ip>:8000/mcp/<key>`). The key can also be sent as `Authorization: Bearer <key>` to `http://<host>:8000/mcp`.
+- **From the internet** (for example claude.ai or ChatGPT custom connectors, which need https): forward it through your reverse proxy (Nginx Proxy Manager, Cloudflare Tunnel...) to port 8000 and use `https://<your-domain>/mcp/<key>`.
+- **Plain Docker install:** the add-on connects to Home Assistant by itself. In Docker, set `HA_URL` and `HA_TOKEN` (a long-lived access token from your HA profile → Security), or enter them on the Devices tab.
 
 ## Connect Personal AI (Home Assistant)
 
@@ -53,9 +92,14 @@ Things to know about the built-in Ollama:
 
 ## Settings by environment / add-on options
 
-`PROXY_API_KEY`, `ADMIN_PASSWORD`, `OLLAMA_URL`, `OLLAMA_PRELOAD`, and `<PROVIDER>_API_KEY_<N>` (e.g. `GEMINI_API_KEY_2`). Known provider names are created automatically; add any other OpenAI-compatible service from the Providers tab.
+`PROXY_API_KEY`, `ADMIN_PASSWORD`, `OLLAMA_URL`, `OLLAMA_PRELOAD`, `HA_URL`, `HA_TOKEN` (Docker only, for Devices), `CLI_CONCURRENCY`, and `<PROVIDER>_API_KEY_<N>` (e.g. `GEMINI_API_KEY_2`). Known provider names are created automatically; add any other OpenAI-compatible service from the Providers tab.
 
 ## Troubleshooting
+
+- **Account sign-in window shows an error:** read the text in the window; press **Sign in again** to start over. "Not logged in" or "authentication" errors in chat mean the sign-in expired: sign in again.
+- **An account model answers slowly:** normal for the first request after a restart (the tool loads). Big Home Assistant prompts (many exposed entities) also take longer.
+- **Devices tab says Home Assistant isn't connected:** update the add-on (1.7.0 adds Home Assistant API access) and restart it. In Docker, check `HA_URL` and `HA_TOKEN`.
+- **An MCP app says 401:** the address is wrong, was replaced with **New address**, or the server is turned off.
 
 - **Downloads fail / "Can't reach Ollama":** with the built-in Ollama the address must be `http://127.0.0.1:11434` (Settings → *Use the built-in Ollama*). For an Ollama elsewhere it must be that machine's LAN address. Use Settings → Test connection, and check the add-on log.
 - **Out of memory / add-on restarts while chatting:** the model is too big for the free RAM. Pick a smaller one or a smaller quantisation.
