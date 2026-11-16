@@ -280,7 +280,7 @@
           "data_description": {
             "model": "The transcription model on your server (e.g. whisper-base.en for the add-on)",
             "stt_language": "Optional two-letter code like en. Leave blank to use the voice pipeline's language.",
-            "stt_prompt": "Optional words to help it spell names right, e.g. 'kitchen, living room, MJ'."
+            "stt_prompt": "Optional words to help it spell names right, e.g. 'kitchen, living room, Sam'."
           }
         },
         "reconfigure": {
@@ -293,7 +293,7 @@
           "data_description": {
             "model": "The transcription model on your server (e.g. whisper-base.en for the add-on)",
             "stt_language": "Optional two-letter code like en. Leave blank to use the voice pipeline's language.",
-            "stt_prompt": "Optional words to help it spell names right, e.g. 'kitchen, living room, MJ'."
+            "stt_prompt": "Optional words to help it spell names right, e.g. 'kitchen, living room, Sam'."
           }
         }
       },
