@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2 - 2026-11-17
+
+- Uses the shared **add-on wallpaper** you pick in Photo Hub (new *Add-on wallpaper* tab). This add-on's own Wallpaper option still wins when set.
+
 ## 2.0.1 - 2026-11-16
 
 - **Fixed: changes to a computer, command or remote MCP server weren't saved.** Picking *Read & write files* or *Full control*, folder limits, the computer, the command, its environment, the URL or headers all reverted to what they were when you opened the settings. Only the name stuck. Now every field saves.

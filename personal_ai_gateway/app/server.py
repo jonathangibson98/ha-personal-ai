@@ -28,7 +28,7 @@ from store import DATA_DIR, PRESETS, Store
 from tunnel import Tunnel
 from upstream import Gateway, err, sanitize
 
-VERSION = "2.0.1"
+VERSION = "2.0.2"
 TEST_MODELS = {"gemini": "gemini-2.5-flash", "openai": "gpt-4o-mini", "groq": "llama-3.3-70b-versatile",
                "mistral": "mistral-small-latest", "deepseek": "deepseek-chat", "cerebras": "llama3.1-8b"}
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
