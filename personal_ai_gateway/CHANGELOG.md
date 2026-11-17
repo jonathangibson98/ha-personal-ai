@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0 - 2026-11-16
+
+- **HTTPS address for MCP servers.** Claude, ChatGPT and other apps only connect to MCP servers over https. New card at the top of the MCP tab: an **instant Cloudflare tunnel** (no account, one tap), **your own Cloudflare tunnel** (fixed address on your domain, paste a token), or **your own HTTPS** (Nginx Proxy Manager, DuckDNS, Tailscale Funnel…). Server cards then show the https address to copy. Only `/mcp/<key>` goes through it (a separate MCP-only listener); the page and the `/v1` API stay on your network.
+- **Ollama is optional and no longer built in.** The built-in Ollama, its options and port 11434 are gone (much smaller image), and the old `/data/ollama` model folder is deleted on first start. Without an Ollama address nothing about Ollama shows: no Models tab, no Ollama status, no errors. Add an address in Settings → *Ollama (optional)* if you run one.
+- **Chat = Open WebUI.** New companion add-on *Open WebUI (AI Gateway chat)* in this repository connects to the gateway by itself. The Chat tab opens it (or embeds it when Home Assistant is on http); the quick test chat stays below. Docker Compose now runs Open WebUI instead of Ollama.
+- **New look.** Redesigned page: app header with status, icon tab bar (floating at the bottom on phones, across the top on wide screens), softer cards, gradient buttons, overview tiles, nicer chat bubbles, segmented choices. Still follows your Home Assistant theme and wallpaper.
+- Fixed: pressed/selected buttons (Models sub-tabs, small toggles) never showed as selected.
+- The Wallpaper option's label now shows on the Configuration tab.
+
 ## 1.10.0 - 2026-11-16
 
 - **Pick the web UI wallpaper.** New **Wallpaper** option on the Configuration tab. Leave it empty to use your Home Assistant theme's wallpaper, enter `none` for no wallpaper, or point it at your own image: drop it in `/config/www` and enter the file name (e.g. `wallpaper.jpg`), `/local/wallpaper.jpg`, or a full `https://` link.

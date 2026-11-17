@@ -1,4 +1,6 @@
 # Personal AI Gateway as a normal Docker container (no Home Assistant add-on needed).
+FROM cloudflare/cloudflared:latest AS cloudflared
+
 FROM python:3.12-alpine
 # Node.js runs the official Claude / ChatGPT (Codex) / Gemini sign-in tools, installed on demand into /data.
 RUN apk add --no-cache nodejs npm git ripgrep libgcc libstdc++ bash openssh-client openssh-keygen sshpass \
@@ -10,6 +12,7 @@ ENV DATA_DIR=/data PYTHONUNBUFFERED=1 PORT=8000
 VOLUME /data
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://127.0.0.1:8000/health >/dev/null || exit 1
+COPY --from=cloudflared /usr/local/bin/cloudflared /usr/local/bin/cloudflared
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh
 CMD ["/run.sh"]

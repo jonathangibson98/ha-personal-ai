@@ -4,7 +4,6 @@ import json
 import os
 import re
 import secrets
-import shutil
 from pathlib import Path
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
@@ -26,12 +25,17 @@ DEFAULT_SETTINGS = {
     "rotation": "balanced",          # balanced | sequential
     "cooldowns": [10, 30, 60, 120],  # seconds, escalating per consecutive failure
     "timeout_s": 120,
-    "ollama_url": "http://host.docker.internal:11434",
+    "ollama_url": "",                # optional: an Ollama you run somewhere. Empty = no Ollama
     "ollama_preload": "",
+    "public_mode": "off",            # off | quick | token | url  (HTTPS address for the MCP servers)
+    "public_url": "",                # your own https:// address (url mode, or the hostname of a token tunnel)
+    "cf_token": "",                  # Cloudflare tunnel token (token mode)
 }
+SECRET_SETTINGS = ("cf_token",)
+# Old defaults from when Ollama was built in or assumed; they mean "no Ollama" now.
+OLD_OLLAMA_DEFAULTS = ("http://127.0.0.1:11434", "http://172.30.32.1:11434", "http://host.docker.internal:11434",
+                       "http://localhost:11434")
 
-BUNDLED_URL = "http://127.0.0.1:11434"
-LEGACY_ADDON_URL = "http://172.30.32.1:11434"  # old add-on default, ignored when Ollama is built in
 NAME_RE = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}")
 
 
@@ -81,8 +85,20 @@ class Store:
             if name in PRESETS and name not in self.data["providers"]:
                 self.data["providers"][name] = {"kind": "openai", "base_url": PRESETS[name]["base_url"],
                                                 "keys": [], "enabled": True}
-        if "ollama" not in self.data["providers"]:
-            self.data["providers"]["ollama"] = {"kind": "ollama", "base_url": "", "keys": [], "enabled": True}
+        if not self.data.get("openwebui_key"):
+            self.data["openwebui_key"] = "owui-" + secrets.token_urlsafe(24)
+            self.save()
+        saved = self.data.get("settings", {})
+        if str(saved.get("ollama_url", "")).rstrip("/") in OLD_OLLAMA_DEFAULTS:
+            saved.pop("ollama_url", None)  # Ollama isn't built in any more
+            self.save()
+        prov = self.data["providers"].get("ollama")
+        if self.ollama_configured():
+            if not prov:
+                self.data["providers"]["ollama"] = {"kind": "ollama", "base_url": "", "keys": [], "enabled": True}
+        elif prov and not prov.get("base_url"):
+            del self.data["providers"]["ollama"]  # nothing to point it at
+            self.save()
 
     # -- values
     @property
@@ -101,8 +117,8 @@ class Store:
         if key in self.data["settings"]:
             return self.data["settings"][key]
         opt = str(self.options.get(key) or "").strip() if key in ("ollama_url", "ollama_preload") else ""
-        if key == "ollama_url" and self.bundled_enabled() and opt in ("", LEGACY_ADDON_URL):
-            return BUNDLED_URL
+        if key == "ollama_url" and opt.rstrip("/") in OLD_OLLAMA_DEFAULTS:
+            opt = ""
         if opt:
             return opt
         if key == "ollama_url" and os.environ.get("OLLAMA_DEFAULT_URL", "").strip():
@@ -110,13 +126,17 @@ class Store:
         return DEFAULT_SETTINGS[key]
 
     def bundled_enabled(self) -> bool:
-        """True in the add-on image, where Ollama is installed and the option isn't switched off."""
-        if not shutil.which("ollama") or os.environ.get("BUILTIN_OLLAMA", "").strip() == "0":
-            return False
-        return self.options.get("builtin_ollama", True) is not False
+        """Ollama used to be built in. It isn't any more; use your own Ollama if you want one."""
+        return False
+
+    def ollama_configured(self) -> bool:
+        return bool(self.ollama_url())
 
     def settings(self) -> dict:
-        return {k: self.setting(k) for k in DEFAULT_SETTINGS}
+        out = {k: self.setting(k) for k in DEFAULT_SETTINGS}
+        for k in SECRET_SETTINGS:
+            out[k + "_set"] = bool(out.pop(k))
+        return out
 
     def set_settings(self, new: dict) -> None:
         s = self.data["settings"]
@@ -131,6 +151,25 @@ class Store:
         for k in ("ollama_url", "ollama_preload"):
             if k in new:
                 s[k] = str(new[k]).strip()
+        if "ollama_url" in new:
+            url = s["ollama_url"]
+            if url and not url.startswith(("http://", "https://")):
+                raise ValueError("The Ollama address must start with http:// or https://")
+            if url and "ollama" not in self.data["providers"]:
+                self.data["providers"]["ollama"] = {"kind": "ollama", "base_url": "", "keys": [], "enabled": True}
+            if not url and not (self.data["providers"].get("ollama") or {}).get("base_url"):
+                self.data["providers"].pop("ollama", None)
+        if new.get("public_mode") in ("off", "quick", "token", "url"):
+            s["public_mode"] = new["public_mode"]
+        if "public_url" in new:
+            u = str(new["public_url"] or "").strip().rstrip("/")
+            if u and not u.startswith("http"):
+                u = "https://" + u
+            if u.startswith("http://"):
+                raise ValueError("The public address must be https:// (that's the point of it).")
+            s["public_url"] = u
+        if new.get("cf_token"):
+            s["cf_token"] = str(new["cf_token"]).strip()
         self.save()
 
     def ollama_url(self) -> str:
@@ -184,8 +223,8 @@ class Store:
         self.save()
 
     def delete_provider(self, name: str) -> None:
-        if name == "ollama":
-            raise ValueError("The local Ollama provider can't be removed (disable it instead).")
+        if name == "ollama" and self.ollama_configured():
+            raise ValueError("Clear the Ollama address in Settings first (or disable this provider).")
         self.data["providers"].pop(name, None)
         self.save()
 

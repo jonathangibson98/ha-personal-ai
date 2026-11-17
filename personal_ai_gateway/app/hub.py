@@ -74,26 +74,6 @@ def quants_from_files(siblings: list[dict]) -> list[dict]:
 
 # ------------------------------------------------------------ Ollama client
 
-async def run_bundled(store) -> None:
-    """Run `ollama serve` inside this container and restart it if it ever stops."""
-    root = Path(os.environ.get("DATA_DIR", "/data")) / "ollama"
-    (root / "models").mkdir(parents=True, exist_ok=True)
-    env = {**os.environ, "HOME": str(root), "OLLAMA_MODELS": str(root / "models"), "OLLAMA_HOST": "0.0.0.0:11434",
-           "OLLAMA_KEEP_ALIVE": str(store.options.get("ollama_keep_alive") or "5m"),
-           "OLLAMA_NUM_PARALLEL": "1", "OLLAMA_MAX_LOADED_MODELS": "1"}
-    while True:
-        # Output is inherited, so it shows in the add-on log and can never block Ollama on a full pipe.
-        proc = await asyncio.create_subprocess_exec("ollama", "serve", env=env)
-        log.info("Built-in Ollama started (models in %s)", root / "models")
-        try:
-            await proc.wait()
-        except asyncio.CancelledError:
-            proc.terminate()
-            raise
-        log.warning("Built-in Ollama stopped (exit code %s); restarting in 5 s", proc.returncode)
-        await asyncio.sleep(5)
-
-
 class OllamaError(Exception):
     pass
 
@@ -109,6 +89,8 @@ class Hub:
         return self.store.ollama_url()
 
     async def _json(self, method: str, path: str, **kw):
+        if not self.base:
+            raise OllamaError("No Ollama set up. Add its address in Settings if you have one.")
         try:
             async with self.session.request(method, self.base + path, timeout=ClientTimeout(total=kw.pop("t", 20)), **kw) as r:
                 text = await r.text()
@@ -120,13 +102,15 @@ class Hub:
 
     async def status(self, url: str | None = None) -> dict:
         base = (url or self.base).rstrip("/")
+        if not base:
+            return {"ok": False, "configured": False, "url": "", "error": "No Ollama set up (optional: add its address in Settings)."}
         try:
             async with self.session.get(base + "/api/version", timeout=ClientTimeout(total=6)) as r:
                 if r.status != 200:
-                    return {"ok": False, "url": base, "error": f"{base} answered HTTP {r.status}. Is that really Ollama?"}
-                return {"ok": True, "url": base, "version": (await r.json(content_type=None)).get("version", "")}
+                    return {"ok": False, "configured": True, "url": base, "error": f"{base} answered HTTP {r.status}. Is that really Ollama?"}
+                return {"ok": True, "configured": True, "url": base, "version": (await r.json(content_type=None)).get("version", "")}
         except (ClientError, asyncio.TimeoutError, ValueError) as e:
-            return {"ok": False, "url": base, "error": f"Can't reach Ollama at {base} ({type(e).__name__}). {UNREACHABLE_HINT}"}
+            return {"ok": False, "configured": True, "url": base, "error": f"Can't reach Ollama at {base} ({type(e).__name__}). {UNREACHABLE_HINT}"}
 
     async def installed(self) -> list[dict]:
         data = await self._json("GET", "/api/tags")
@@ -165,13 +149,8 @@ class Hub:
         return job
 
     def _models_free(self) -> int | None:
-        """Free disk space where the built-in Ollama keeps models (None for an Ollama elsewhere)."""
-        from store import BUNDLED_URL
-        if not (self.store.bundled_enabled() and self.base == BUNDLED_URL):
-            return None
-        root = Path(os.environ.get("DATA_DIR", "/data")) / "ollama"
-        root.mkdir(parents=True, exist_ok=True)
-        return shutil.disk_usage(root).free
+        """Free disk space for models: unknown for an Ollama on another machine."""
+        return None
 
     async def _pull_once(self, job: dict, layers: dict) -> None:
         async with self.session.post(self.base + "/api/pull", json={"model": job["name"], "name": job["name"], "stream": True},
@@ -242,7 +221,7 @@ class Hub:
     async def preload(self) -> None:
         """Download the models named in ollama_preload that aren't installed yet."""
         wanted = [m.strip() for m in re.split(r"[,\n]", str(self.store.setting("ollama_preload"))) if m.strip()]
-        if not wanted:
+        if not wanted or not self.base:
             return
         for _ in range(30):  # Ollama may still be starting
             if (await self.status())["ok"]:

@@ -1,13 +1,14 @@
 name: Personal AI Gateway
-version: "1.10.0"
+version: "2.0.0"
 slug: personal_ai_gateway
 image: "ghcr.io/jonathangibson98/{arch}-addon-personal_ai_gateway"
-description: One OpenAI-compatible endpoint for your AI keys, Claude/ChatGPT/Gemini account sign-in without API keys, built-in Ollama, and MCP servers for your devices, your other computers (SSH) and any MCP tool you run
+description: One OpenAI-compatible endpoint for your AI keys and Claude/ChatGPT/Gemini account sign-in, MCP servers (with an HTTPS address) for your devices, computers and tools, and Open WebUI chat
 arch:
   - aarch64
   - amd64
 init: false
 homeassistant_api: true
+hassio_api: true
 startup: services
 boot: auto
 ingress: true
@@ -16,16 +17,13 @@ panel_icon: mdi:router-network
 panel_title: AI Gateway
 ports:
   8000/tcp: 8000
-  11434/tcp: null
 ports_description:
   8000/tcp: "OpenAI-compatible API (apps send the proxy key) and MCP servers (/mcp/<key>)"
-  11434/tcp: "Built-in Ollama (optional, no password, only open it on a trusted network)"
 backup_exclude:
-  - /data/ollama/**
   - /data/cli/npm/**
+map:
+  - share:rw
 options:
-  builtin_ollama: true
-  ollama_keep_alive: "5m"
   proxy_key: ""
   admin_password: ""
   ollama_url: ""
@@ -33,8 +31,6 @@ options:
   api_keys: []
   wallpaper: ""
 schema:
-  builtin_ollama: bool
-  ollama_keep_alive: str?
   proxy_key: password?
   admin_password: password?
   ollama_url: str?

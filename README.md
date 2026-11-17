@@ -132,7 +132,9 @@ homeassistant:
 The `personal_ai_gateway/` folder is a companion server (Docker Compose or Home Assistant add-on) that gives this integration one OpenAI-compatible address for all your providers:
 
 - several API keys per provider with **rotation, cooldowns and failover**, plus **fallback routes** (try Gemini, then Groq, then local),
-- **host the AI yourself**: manage Ollama, **search the Ollama library and Hugging Face**, download models with a progress meter,
+- **Open WebUI chat**: a companion add-on (`open_webui/`) that connects to the gateway by itself,
+- **an https address for the MCP servers** (instant Cloudflare tunnel, your own tunnel, or your own proxy) so Claude and ChatGPT connectors work,
+- optional: manage an Ollama you run (search the Ollama library and Hugging Face, download with a progress meter),
 - **sign in with your Claude, ChatGPT or Gemini account** instead of an API key (uses each company's official CLI),
 - **MCP servers for your other computers over SSH** (system info, files, commands, with the access you pick), for any stdio MCP tool, or wrapping another MCP URL,
 - **MCP servers for the Home Assistant devices you choose**, each device hidden, read-only or controllable,
@@ -147,7 +149,7 @@ The gateway can be the add-on or the Docker version on any other device: Home As
 - **Providers and API keys:** add a ready-made provider (OpenAI, Gemini, Groq, OpenRouter...) or any OpenAI-compatible server, add more keys for rotation, remove providers.
 - **Sign in with Claude, ChatGPT or Gemini:** install the official tool on the gateway, then sign in: open the link, paste the code. No API key.
 - **Devices:** make MCP servers and pick, with Home Assistant's own device and entity pickers, what each can see or control. Shows the MCP address when you save. Also: which device list the signed-in accounts may use, and (Docker only) connecting the gateway to this Home Assistant with a long-lived token.
-- **Download a local model** into the gateway's Ollama.
+- **Download a local model** into your Ollama (when the gateway has one set up).
 
 If the gateway has its own `ADMIN_PASSWORD`, Configure asks for it once. Action `personal_ai.add_api_key` adds a key (or a new provider) from scripts and automations.
 

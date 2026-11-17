@@ -1,8 +1,6 @@
-# Gateway + a built-in Ollama, so no second machine or container is needed.
-# Ollama's binary needs glibc, so this uses Ubuntu rather than the Alpine-based Home Assistant base.
-FROM ollama/ollama:latest AS ollama
-# Add-ons have no GPU access, so drop the large GPU libraries and keep the CPU ones.
-RUN rm -rf /usr/lib/ollama/cuda_* /usr/lib/ollama/rocm /usr/lib/ollama/vulkan
+# Personal AI Gateway add-on. Ubuntu base: the account sign-in tools (Node) want glibc.
+# cloudflared gives the MCP servers an https address (Settings in the MCP tab).
+FROM cloudflare/cloudflared:latest AS cloudflared
 
 # Node.js runs the official Claude / ChatGPT (Codex) / Gemini sign-in tools, installed on demand into /data.
 FROM node:22-bookworm-slim AS node
@@ -19,8 +17,7 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && node --version && npm --version
 # uv / uvx, for MCP servers written in Python ("Command" MCP servers).
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
-COPY --from=ollama /usr/bin/ollama /usr/bin/ollama
-COPY --from=ollama /usr/lib/ollama /usr/lib/ollama
+COPY --from=cloudflared /usr/local/bin/cloudflared /usr/local/bin/cloudflared
 
 COPY run.sh /run.sh
 COPY app /app
