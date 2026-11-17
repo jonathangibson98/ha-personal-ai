@@ -1,5 +1,5 @@
 name: Personal AI Gateway
-version: "2.1.0"
+version: "2.1.1"
 slug: personal_ai_gateway
 image: "ghcr.io/jonathangibson98/{arch}-addon-personal_ai_gateway"
 description: One OpenAI-compatible endpoint for your AI keys and Claude/ChatGPT/Gemini account sign-in, MCP servers (with an HTTPS address) for your devices, computers and tools, and Open WebUI chat
