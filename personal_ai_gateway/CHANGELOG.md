@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0 - 2026-11-17
+
+- **Sign-in page that remembers you.** No more password pop-up on every visit: a proper sign-in screen with **Keep me signed in** (90 days, renewed while you use it). It uses a secure cookie the page's scripts can't read. Settings → *Signed in* has **Sign out** and **Sign out everywhere**. Changing the admin password (or the proxy key, when it's the password) signs every device out. Five wrong passwords in five minutes pause sign-in for that address. Inside Home Assistant nothing changes: no sign-in needed.
+- **Better on phones.** All tabs fit the bottom bar on any phone (short names on small screens), bigger buttons and switches, cards and choices sized for a phone, chat and Open WebUI use the real screen height, no sideways scrolling anywhere.
+- **Add to Home Screen.** It now has an app name and icon, so it opens full-screen like an app.
+
 ## 2.0.2 - 2026-11-17
 
 - Uses the shared **add-on wallpaper** you pick in Photo Hub (new *Add-on wallpaper* tab). This add-on's own Wallpaper option still wins when set.

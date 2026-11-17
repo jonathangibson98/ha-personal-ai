@@ -132,6 +132,12 @@ Gateway on `http://<host>:8000` (sign in with the proxy key), chat on `http://<h
 
 **Upgrading from 1.x:** Ollama is no longer built in. On first start 2.0 deletes the old built-in Ollama's model folder (`/data/ollama`) to free the space. If you want Ollama, run it anywhere (another PC, a NAS, `ollama/ollama` in Docker) and put its address in Settings.
 
+## Signing in
+
+Outside Home Assistant (Docker, or the add-on's port 8000) the page asks for the **admin password**: your `ADMIN_PASSWORD`, or the proxy key if you didn't set one. Leave **Keep me signed in** on and that phone or computer stays signed in for 90 days (renewed while you use it). Sign out from Settings → *Signed in*; **Sign out everywhere** signs out every device. Inside Home Assistant there's no sign-in.
+
+On a phone, use Share → **Add to Home Screen** and it opens like an app.
+
 ## Settings by environment / add-on options
 
 `PROXY_API_KEY`, `ADMIN_PASSWORD`, `OLLAMA_URL` (optional), `OLLAMA_PRELOAD`, `OPEN_WEBUI_PORT` (Docker), `HA_URL`, `HA_TOKEN` (Docker only, for device MCP servers), `CLI_CONCURRENCY`, and `<PROVIDER>_API_KEY_<N>` (e.g. `GEMINI_API_KEY_2`). Known provider names are created automatically; add any other OpenAI-compatible service from the Providers tab.
