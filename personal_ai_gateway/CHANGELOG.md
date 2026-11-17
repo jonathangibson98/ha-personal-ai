@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1 - 2026-11-17
+
+- **Easier to read over wallpapers.** The page checks how bright the wallpaper is and tints behind the text just enough to keep it readable: bright wallpapers get more, dark ones barely any.
+
 ## 2.1.0 - 2026-11-17
 
 - **Sign-in page that remembers you.** No more password pop-up on every visit: a proper sign-in screen with **Keep me signed in** (90 days, renewed while you use it). It uses a secure cookie the page's scripts can't read. Settings → *Signed in* has **Sign out** and **Sign out everywhere**. Changing the admin password (or the proxy key, when it's the password) signs every device out. Five wrong passwords in five minutes pause sign-in for that address. Inside Home Assistant nothing changes: no sign-in needed.
