@@ -1,0 +1,27 @@
+name: Open WebUI (AI Gateway chat)
+version: "1.0.0"
+slug: open_webui
+image: "ghcr.io/jonathangibson98/{arch}-addon-open_webui"
+description: ChatGPT-style chat app for every model in your Personal AI Gateway. Connects to the gateway by itself.
+url: https://github.com/jonathangibson98/ha-personal-ai
+arch:
+  - aarch64
+  - amd64
+init: false
+webui: "http://[HOST]:[PORT:8080]"
+ports:
+  8080/tcp: 3000
+ports_description:
+  8080/tcp: "Open WebUI (chat app)"
+map:
+  - share:ro
+backup_exclude:
+  - /data/open-webui/cache/**
+options:
+  require_login: true
+  gateway_url: ""
+  api_key: ""
+schema:
+  require_login: bool
+  gateway_url: str?
+  api_key: password?

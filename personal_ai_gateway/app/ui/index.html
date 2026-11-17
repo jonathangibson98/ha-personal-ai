@@ -5,74 +5,134 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Personal AI Gateway</title>
 <style>
+/* Personal AI Gateway — own look when opened directly; inside Home Assistant the theme script
+   (further down) maps these colors to your HA theme (wallpaper and glass cards included). */
 :root{
-  --bg:#e3e0d6; --panel:#efece4; --ink:#1c2226; --muted:#66706f; --line:#c9c5b8; --accent:#27596f; --accent-ink:#fff;
-  --ready:#2e9e5b; --cooling:#d99a1e; --locked:#cf4a3a; --off:#9aa09c; --danger:#b8402f;
-  --sans:"Avenir Next","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+  --bg:#f4f5f7; --bg2:#e9ecf2; --panel:#ffffff; --ink:#15181d; --muted:#6a7280; --line:#e2e5ec;
+  --accent:#4f6bff; --accent2:#8a5cff; --accent-ink:#fff;
+  --ready:#1fb87a; --cooling:#f2a31b; --locked:#ef5a4a; --off:#a7adb8; --danger:#d9443a;
+  --sans:ui-rounded,"SF Pro Rounded","SF Pro Text",-apple-system,"Segoe UI",system-ui,Roboto,sans-serif;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --r:18px; --shadow:0 1px 2px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.06);
 }
 @media (prefers-color-scheme:dark){
-  :root{--bg:#161a1c; --panel:#20262a; --ink:#e8e6df; --muted:#98a3a3; --line:#333b3f; --accent:#6bb3cf; --accent-ink:#0d1a20;
-        --ready:#4ccf85; --cooling:#f0b43c; --locked:#ff7766; --off:#5b6462; --danger:#ff8a78}
+  :root{--bg:#0e1015; --bg2:#151821; --panel:#171a23; --ink:#eef0f5; --muted:#9097a6; --line:#262a36;
+        --accent:#7c8dff; --accent2:#b28cff; --accent-ink:#0b0d14;
+        --ready:#3ddc97; --cooling:#ffc04d; --locked:#ff7a6b; --off:#5a6170; --danger:#ff8a7a;
+        --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.25)}
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--sans);display:flex;flex-direction:column;
+body{background:radial-gradient(1200px 600px at 10% -10%,color-mix(in srgb,var(--accent) 10%,transparent),transparent 60%),var(--bg);
+  color:var(--ink);font:15.5px/1.5 var(--sans);display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;
   padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
-header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:12px 16px 8px}
-h1{font-size:1.1rem;margin:0;font-weight:700;letter-spacing:.01em}
-header small{color:var(--muted)}
-main{flex:1;overflow-y:auto;padding:4px 16px 24px;max-width:760px;width:100%;margin:0 auto}
-nav{display:grid;grid-template-columns:repeat(7,1fr);background:var(--panel);border-top:1px solid var(--line);
-  padding-bottom:env(safe-area-inset-bottom)}
-nav button{background:none;border:0;padding:11px 2px 10px;font:inherit;font-size:.78rem;color:var(--muted);cursor:pointer;border-top:3px solid transparent}
-nav button[aria-current=page]{color:var(--ink);border-top-color:var(--accent);font-weight:650}
-:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
-h2{font-size:1rem;margin:18px 0 8px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:10px 0}
-.card h3{margin:0 0 6px;font-size:1rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+header{display:flex;align-items:center;gap:12px;padding:14px 18px 6px;max-width:980px;width:100%;margin:0 auto}
+.logo{width:38px;height:38px;border-radius:12px;flex:none;display:grid;place-items:center;color:#fff;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 35%,transparent)}
+.logo svg{width:22px;height:22px;fill:currentColor}
+h1{font-size:1.15rem;margin:0;font-weight:750;letter-spacing:-.01em;line-height:1.2}
+header small{color:var(--muted);font-size:.78rem}
+.pill{margin-left:auto;font-size:.75rem;font-weight:650;padding:4px 10px;border-radius:99px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.pill.good{color:var(--ready);border-color:color-mix(in srgb,var(--ready) 40%,transparent);background:color-mix(in srgb,var(--ready) 10%,transparent)}
+.pill.warn{color:var(--cooling);border-color:color-mix(in srgb,var(--cooling) 40%,transparent);background:color-mix(in srgb,var(--cooling) 10%,transparent)}
+main{flex:1;overflow-y:auto;padding:6px 18px 28px;max-width:980px;width:100%;margin:0 auto;scroll-behavior:smooth}
+/* tabs: a floating bar at the bottom on phones, a segmented bar under the header on wide screens */
+nav{display:grid;grid-template-columns:repeat(var(--n,7),1fr);gap:2px;background:color-mix(in srgb,var(--panel) 88%,transparent);
+  -webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4);
+  border:1px solid var(--line);border-radius:22px;margin:0 10px calc(10px + env(safe-area-inset-bottom));padding:5px;box-shadow:var(--shadow);order:3}
+nav button{background:none;border:0;border-radius:16px;padding:7px 2px 6px;font:inherit;font-size:.68rem;font-weight:600;color:var(--muted);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:3px;transition:background .15s,color .15s}
+nav svg{width:21px;height:21px;fill:currentColor}
+nav button:hover{color:var(--ink)}
+nav button[aria-current=page]{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+header{order:0}main{order:2}
+@media (min-width:820px){
+  nav{order:1;max-width:944px;width:calc(100% - 36px);margin:6px auto 4px;display:flex;border-radius:16px}
+  nav button{flex:1;flex-direction:row;justify-content:center;gap:7px;font-size:.86rem;padding:9px 6px;border-radius:12px}
+  nav svg{width:18px;height:18px}
+}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:2px}
+h2{font-size:.8rem;margin:22px 4px 8px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;margin:12px 0;box-shadow:var(--shadow)}
+.card.hero{background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 9%,var(--panel)),var(--panel) 55%)}
+.card h3{margin:0 0 6px;font-size:1.02rem;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap;letter-spacing:-.005em}
+details.card>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary::after{content:"›";margin-left:auto;color:var(--muted);font-size:1.3rem;transition:transform .2s}
+details.card[open]>summary::after{transform:rotate(90deg)}
+details.card[open]>summary{margin-bottom:8px}
 .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .row.sp{justify-content:space-between}
 .grow{flex:1;min-width:0}
 .muted{color:var(--muted);font-size:.88rem}
-.mono{font-family:var(--mono);font-size:.84rem;overflow-wrap:anywhere}
-button.b,a.b{font:inherit;font-size:.9rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:9px;padding:6px 12px;cursor:pointer;text-decoration:none}
-button.b.p{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
-button.b.d{color:var(--danger)}
-button.b:disabled{opacity:.5;cursor:default}
-input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;max-width:100%}
-input[type=text],input[type=password],input:not([type]),textarea,select{width:100%}
-textarea{min-height:84px;font-family:var(--mono);font-size:.9rem}
-label.f{display:block;margin:10px 0 3px;font-size:.88rem;color:var(--muted)}
-.lamp{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--off);flex:none;box-shadow:0 0 0 2px var(--panel),0 0 0 3px var(--line)}
-.lamp.ready{background:var(--ready);box-shadow:0 0 0 2px var(--panel),0 0 8px 1px var(--ready)}
-.lamp.cooling{background:var(--cooling);box-shadow:0 0 0 2px var(--panel),0 0 8px 1px var(--cooling)}
-.lamp.locked{background:var(--locked);box-shadow:0 0 0 2px var(--panel),0 0 8px 1px var(--locked)}
-.chip{font-size:.78rem;border:1px solid var(--line);border-radius:6px;padding:1px 7px;color:var(--muted);white-space:nowrap}
-.sub{display:flex;gap:6px;margin:10px 0}
-.sub button{flex:1;font:inherit;font-size:.9rem;padding:7px;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:9px;cursor:pointer}
-.sub button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
-.meter{display:grid;grid-template-columns:repeat(20,1fr);gap:2px;height:14px;margin:8px 0 4px}
-.meter i{background:var(--line);border-radius:2px}
-.meter i.on{background:var(--ready)}
-.keyrow{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+p{margin:6px 0}
+.mono{font-family:var(--mono);font-size:.82rem;overflow-wrap:anywhere}
+button.b,a.b{font:inherit;font-size:.88rem;font-weight:600;border:1px solid var(--line);background:var(--bg2);color:var(--ink);border-radius:12px;padding:8px 14px;
+  cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:transform .08s,filter .15s,background .15s}
+button.b:hover,a.b:hover{filter:brightness(1.04)}
+button.b:active,a.b:active{transform:scale(.97)}
+button.b.p,a.b.p{background:linear-gradient(135deg,var(--accent),var(--accent2));color:var(--accent-ink);border-color:transparent;
+  box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 30%,transparent)}
+button.b.d{color:var(--danger);background:color-mix(in srgb,var(--danger) 8%,transparent);border-color:color-mix(in srgb,var(--danger) 25%,transparent)}
+button.b:disabled{opacity:.5;cursor:default;transform:none}
+input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;max-width:100%;
+  transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 18%,transparent)}
+input[type=text],input[type=password],input[type=search],input:not([type]),textarea,select{width:100%}
+input[type=checkbox]{accent-color:var(--accent);width:18px;height:18px}
+textarea{min-height:84px;font-family:var(--mono);font-size:.88rem}
+label.f{display:block;margin:12px 2px 5px;font-size:.82rem;font-weight:600;color:var(--muted)}
+.lamp{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--off);flex:none}
+.lamp.ready{background:var(--ready);box-shadow:0 0 0 3px color-mix(in srgb,var(--ready) 22%,transparent)}
+.lamp.cooling{background:var(--cooling);box-shadow:0 0 0 3px color-mix(in srgb,var(--cooling) 22%,transparent)}
+.lamp.locked{background:var(--locked);box-shadow:0 0 0 3px color-mix(in srgb,var(--locked) 22%,transparent)}
+.chip{font-size:.72rem;font-weight:600;border-radius:99px;padding:2px 9px;color:var(--muted);background:var(--bg2);border:1px solid var(--line);white-space:nowrap}
+.sub{display:flex;gap:4px;margin:12px 0;padding:4px;background:var(--bg2);border:1px solid var(--line);border-radius:14px}
+.sub button{flex:1;font:inherit;font-size:.86rem;font-weight:600;padding:8px;border:0;background:none;color:var(--muted);border-radius:10px;cursor:pointer}
+.sub button[aria-pressed]{background:var(--panel);color:var(--ink);box-shadow:var(--shadow)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:12px 0}
+.tile{font:inherit;text-align:left;cursor:pointer;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);
+  color:var(--ink);display:flex;flex-direction:column;gap:2px;transition:transform .12s}
+.tile:hover{transform:translateY(-2px)}
+.tile b{font-size:.95rem}
+.tile span{font-size:.8rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin:12px 0 4px}
+.choice{font:inherit;text-align:left;cursor:pointer;background:var(--bg2);border:1.5px solid var(--line);border-radius:14px;padding:10px 12px;color:var(--ink);display:flex;flex-direction:column;gap:2px}
+.choice b{font-size:.9rem}
+.choice span{font-size:.78rem;color:var(--muted)}
+.choice[aria-pressed]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--panel))}
+.status{border-radius:12px;padding:9px 12px;font-size:.88rem;font-weight:600;margin:10px 0}
+.status.good{background:color-mix(in srgb,var(--ready) 12%,transparent);color:var(--ready)}
+.status.warn{background:color-mix(in srgb,var(--cooling) 14%,transparent);color:var(--cooling)}
+.status.bad{background:color-mix(in srgb,var(--locked) 12%,transparent);color:var(--locked)}
+.status .mono{color:var(--ink)}
+ol.steps{margin:8px 0;padding-left:20px;font-size:.86rem;color:var(--muted)}
+ol.steps li{margin:3px 0}
+iframe.owui{width:100%;height:calc(100vh - 230px);min-height:520px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);box-shadow:var(--shadow)}
+.meter{display:grid;grid-template-columns:repeat(20,1fr);gap:2px;height:12px;margin:8px 0 4px}
+.meter i{background:var(--line);border-radius:3px}
+.meter i.on{background:linear-gradient(var(--ready),color-mix(in srgb,var(--ready) 70%,#000))}
+.keyrow{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);flex-wrap:wrap}
 .keyrow:first-of-type{border-top:0}
-.note{padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--cooling) 20%,var(--panel));font-size:.9rem;margin:10px 0}
+.note{padding:11px 14px;border-radius:12px;background:color-mix(in srgb,var(--cooling) 14%,var(--panel));font-size:.88rem;margin:10px 0;border:1px solid color-mix(in srgb,var(--cooling) 25%,transparent)}
 .err{color:var(--danger)}
-pre.term{background:#0d1114;color:#d8e0e0;border-radius:10px;padding:10px;font:12px/1.4 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow-y:auto;margin:8px 0}
-details.dev{border-top:1px solid var(--line);padding:6px 0}
+pre.term{background:#0b0d12;color:#d7dde8;border-radius:12px;padding:12px;font:12px/1.45 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow-y:auto;margin:8px 0}
+details.dev{border-top:1px solid var(--line);padding:8px 0}
 details.dev summary{cursor:pointer;display:flex;gap:8px;align-items:center;list-style:none}
 details.dev summary::-webkit-details-marker{display:none}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:none}
-.seg button{font:inherit;font-size:.78rem;border:0;background:var(--bg);color:var(--muted);padding:4px 8px;cursor:pointer}
-.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;flex:none;background:var(--bg2)}
+.seg button{font:inherit;font-size:.76rem;font-weight:600;border:0;background:none;color:var(--muted);padding:5px 9px;cursor:pointer}
+.seg button[aria-pressed]{background:var(--accent);color:var(--accent-ink)}
 .ok{color:var(--ready)}
-#chatlog{display:flex;flex-direction:column;gap:8px;margin:8px 0}
-.m{padding:9px 12px;border-radius:14px;white-space:pre-wrap;overflow-wrap:anywhere;max-width:92%}
-.m.u{align-self:flex-end;background:var(--accent);color:var(--accent-ink)}
-.m.a{align-self:flex-start;background:var(--panel);border:1px solid var(--line)}
-#toast{position:fixed;left:50%;bottom:calc(70px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:10px;font-size:.9rem;max-width:90vw;z-index:9}
-@media (prefers-reduced-motion:no-preference){.lamp.cooling{animation:pulse 2s ease-in-out infinite}@keyframes pulse{50%{opacity:.55}}}
+#chatlog{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+.m{padding:10px 14px;border-radius:18px;white-space:pre-wrap;overflow-wrap:anywhere;max-width:88%;line-height:1.45}
+.m.u{align-self:flex-end;background:linear-gradient(135deg,var(--accent),var(--accent2));color:var(--accent-ink);border-bottom-right-radius:6px}
+.m.a{align-self:flex-start;background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:6px;box-shadow:var(--shadow)}
+#toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;
+  border-radius:14px;font-size:.88rem;font-weight:600;max-width:90vw;box-shadow:0 10px 30px rgba(0,0,0,.25);z-index:20}
+#toast.err{background:var(--danger);color:#fff}
+@media (prefers-reduced-motion:no-preference){.lamp.cooling{animation:pulse 2s ease-in-out infinite}@keyframes pulse{50%{opacity:.55}}
+  main>div>*{animation:rise .25s ease both}@keyframes rise{from{opacity:0;transform:translateY(4px)}}}
 </style>
 </head>
 <body>
@@ -644,7 +704,7 @@ window.__hbAddon = "personal_ai_gateway";
 </script>
 <!-- /ha-theme -->
 
-<header><h1>Personal AI Gateway</h1><small id="ver"></small></header>
+<header><div class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 5.6L20 10l-5.6 2.4L12 18l-2.4-5.6L4 10l5.6-2.4L12 2zm7 13l1 2.3 2.3 1-2.3 1L19 21.6 18 19.3l-2.3-1 2.3-1L19 15z"/></svg></div><div><h1>Personal AI Gateway</h1><small id="ver"></small></div><span id="status" class="pill">…</span></header>
 <main id="main"></main>
 <nav id="nav"></nav>
 <div id="toast" hidden></div>
@@ -698,17 +758,34 @@ window.__hbAddon = "personal_ai_gateway";
   const lamp = s => h('span', { class: 'lamp ' + s, title: s });
   const field = (label, input) => [h('label', { class: 'f' }, label), input];
 
-  const TABS = [['overview', 'Overview'], ['providers', 'Providers'], ['models', 'Models'], ['routes', 'Routes'], ['devices', 'MCP'], ['chat', 'Chat'], ['settings', 'Settings']];
+  const ICONS = {
+    overview: 'M4 13h6V4H4v9zm0 7h6v-5H4v5zm10 0h6v-9h-6v9zm0-16v5h6V4h-6z',
+    providers: 'M12 2 3 7v10l9 5 9-5V7l-9-5zm0 2.3L18.7 8 12 11.7 5.3 8 12 4.3zM5 9.7l6 3.3v6.7l-6-3.3V9.7zm8 10V13l6-3.3v6.7l-6 3.3z',
+    models: 'M4 5h16v4H4zm0 5h16v4H4zm0 5h16v4H4zM6 6.5h2v1H6zm0 5h2v1H6zm0 5h2v1H6z',
+    routes: 'M6 3a3 3 0 0 1 1 5.8V11h7a3 3 0 0 0 3-3v-.2a3 3 0 1 1 2 0V8a5 5 0 0 1-5 5H7v2.2a3 3 0 1 1-2 0V8.8A3 3 0 0 1 6 3z',
+    devices: 'M7 2h2v4h6V2h2v4h1a2 2 0 0 1 2 2v4a6 6 0 0 1-5 5.9V22h-6v-4.1A6 6 0 0 1 4 12V8a2 2 0 0 1 2-2h1V2z',
+    chat: 'M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2z',
+    settings: 'M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7 7 0 0 0-1.7-1L15 3h-4l-.4 2.9a7 7 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7 7 0 0 0 1.7 1L11 21h4l.4-2.9a7 7 0 0 0 1.7-1l2.5 1 2-3.5-2.2-1.6zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z'
+  };
+  const svgIcon = d => { const n = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); n.setAttribute('viewBox', '0 0 24 24'); n.setAttribute('aria-hidden', 'true'); const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', d); n.append(p); return n; };
+  const tabs = () => [['overview', 'Overview'], ['providers', 'Providers'], ...(S && S.ollama && S.ollama.configured ? [['models', 'Models']] : []),
+    ['routes', 'Routes'], ['devices', 'MCP'], ['chat', 'Chat'], ['settings', 'Settings']];
   function drawNav() {
-    $('#nav').replaceChildren(...TABS.map(([id, label]) =>
-      h('button', { type: 'button', 'aria-current': id === tab ? 'page' : null, onclick: () => { tab = id; show(); } }, label)));
+    const list = tabs();
+    $('#nav').style.setProperty('--n', list.length);
+    $('#nav').replaceChildren(...list.map(([id, label]) =>
+      h('button', { type: 'button', 'aria-current': id === tab ? 'page' : null, onclick: () => { tab = id; show(); } }, svgIcon(ICONS[id]), h('span', {}, label))));
   }
 
   async function show() {
     clearInterval(timer);
+    try { S = await api('state'); } catch (e) { drawNav(); return $('#main').replaceChildren(h('p', { class: 'err' }, e.message)); }
+    if (!tabs().some(([id]) => id === tab)) tab = 'overview';
     drawNav();
-    try { S = await api('state'); } catch (e) { return $('#main').replaceChildren(h('p', { class: 'err' }, e.message)); }
     $('#ver').textContent = 'v' + S.version;
+    const ok = Object.values(S.providers).some(p => p.enabled && (p.kind !== 'openai' || p.keys.some(k => k.status === 'ready')));
+    $('#status').className = 'pill ' + (ok ? 'good' : 'warn');
+    $('#status').textContent = ok ? 'Online' : 'Add a provider';
     const root = h('div');
     $('#main').replaceChildren(root);
     await ({ overview, providers, models, routes, devices, chat: chatTab, settings }[tab])(root);
@@ -729,16 +806,18 @@ window.__hbAddon = "personal_ai_gateway";
           h('p', { class: 'muted' }, 'Any OpenAI-compatible app (Home Assistant Personal AI, SillyTavern, Open WebUI…) can use this gateway:'),
           h('div', { class: 'mono' }, 'Server URL  ', serverUrl()),
           h('div', { class: 'mono' }, 'API key     ', keyShown ? S.proxy_key : '••••••••••••••••'),
-          h('p', { class: 'muted' }, 'Model: provider/model, for example ', h('span', { class: 'mono' }, 'ollama/llama3.1:8b'), ' or a route name.'),
+          h('p', { class: 'muted' }, 'Model: provider/model, for example ', h('span', { class: 'mono' }, 'groq/llama-3.3-70b-versatile'), ' or a route name.'),
           h('div', { class: 'row' },
             h('button', { class: 'b', type: 'button', onclick: () => copy(serverUrl()) }, 'Copy URL'),
             h('button', { class: 'b', type: 'button', onclick: () => copy(S.proxy_key) }, 'Copy key'),
             h('button', { class: 'b', type: 'button', onclick: () => { root.dataset.show = keyShown ? '0' : '1'; draw(); } }, keyShown ? 'Hide' : 'Show'))),
-        h('div', { class: 'card' },
-          h('h3', {}, lamp(S.ollama.ok ? 'ready' : 'locked'), 'Your own models (Ollama)'),
-          S.ollama.ok ? h('p', { class: 'muted' }, `Connected to ${S.ollama.url}, version ${S.ollama.version}.`)
-            : h('p', { class: 'err' }, S.ollama.error),
-          h('button', { class: 'b p', type: 'button', onclick: () => { tab = 'models'; modelsTab = 'find'; show(); } }, 'Find a model to download')),
+        h('div', { class: 'tiles' },
+          h('button', { class: 'tile', type: 'button', onclick: () => { tab = 'chat'; show(); } },
+            h('b', {}, 'Chat'), h('span', {}, S.open_webui && S.open_webui.installed ? (S.open_webui.running ? 'Open WebUI is running' : 'Open WebUI is stopped') : 'Quick chat with any model')),
+          h('button', { class: 'tile', type: 'button', onclick: () => { tab = 'devices'; show(); } },
+            h('b', {}, 'MCP over HTTPS'), h('span', {}, S.public.state === 'up' ? S.public.url.replace(/^https:\/\//, '') : S.public.mode === 'off' ? 'Off: LAN only (http)' : S.public.state)),
+          S.ollama.configured ? h('button', { class: 'tile', type: 'button', onclick: () => { tab = 'models'; show(); } },
+            h('b', {}, 'Ollama'), h('span', {}, S.ollama.ok ? `v${S.ollama.version}` : 'Not reachable')) : null),
         h('h2', {}, 'Providers'),
         ...Object.entries(S.providers).map(([name, p]) => h('div', { class: 'card' },
           h('div', { class: 'row sp' },
@@ -903,7 +982,10 @@ window.__hbAddon = "personal_ai_gateway";
   const ACCESS = [['read', 'Look only'], ['files', 'Read & write files'], ['full', 'Full control']];
   async function devices(root) {
     const M = await api('mcp');
-    const base = sid => { const k = M.servers.find(s => s.id === sid)?.key || ''; return `${location.protocol}//${location.hostname}:${M.port}/mcp/${k}`; };
+    const pub = S.public && S.public.state === 'up' && S.public.url ? S.public.url : '';
+    const lanBase = `http://${location.hostname}:${M.port}`;
+    const base = sid => { const k = M.servers.find(s => s.id === sid)?.key || ''; return `${pub || lanBase}/mcp/${k}`; };
+    M.lanBase = lanBase; M.pub = pub;
     const picks = new Set(M.ai_servers || []);
     const aiBox = h('div', {}, M.servers.length ? M.servers.map(s => {
       const cb = h('input', { type: 'checkbox', checked: picks.has(s.id) });
@@ -914,6 +996,7 @@ window.__hbAddon = "personal_ai_gateway";
     const newName = h('input', { placeholder: 'Name, e.g. Garage Pi, Laptop, Living room, GitHub' });
     root.append(...[
       h('p', { class: 'muted' }, 'Each MCP server has its own private address and only gives an AI what you allow: Home Assistant devices, a computer over SSH (your other Pi, your laptop...), any MCP server you run as a command, or another MCP server’s URL. Paste the address into any app that supports MCP (Claude, ChatGPT, Gemini CLI, Cursor…).'),
+      httpsCard(),
       !M.ha_connected && M.servers.some(s => (s.kind || 'ha') === 'ha') ? haSetup(M) : null,
       !M.ha_locked && (M.ha_connected || !M.servers.some(s => (s.kind || 'ha') === 'ha')) ? h('details', {}, h('summary', { class: 'muted' }, 'Home Assistant connection'), haSetup(M)) : null,
       h('div', { class: 'card' }, h('h3', {}, 'Signed-in AIs'),
@@ -931,6 +1014,45 @@ window.__hbAddon = "personal_ai_gateway";
         h('div', { class: 'keyrow' }, h('span', { class: 'mono grow' }, `${c.action} → ${c.entity_id}`), h('span', { class: 'muted' }, `${c.server} · ${ago(c.t)} ago`))))) : null].filter(Boolean));
   }
   let openPicker = '', editComputer = null;
+
+  function httpsCard() {
+    const P = S.public, st = S.settings;
+    const MODES = [['off', 'Off', 'LAN only (http). Fine for apps on your network.'],
+      ['quick', 'Instant tunnel', 'Free Cloudflare quick tunnel, no account. The address changes every time the add-on restarts.'],
+      ['token', 'My Cloudflare tunnel', 'A fixed address on your domain (free Cloudflare account).'],
+      ['url', 'My own HTTPS', 'You already have https in front of the gateway (Nginx Proxy Manager, DuckDNS, Tailscale Funnel…).']];
+    let mode = P.mode;
+    const url = h('input', { value: st.public_url || '', placeholder: 'https://mcp.example.com' });
+    const tok = h('input', { type: 'password', placeholder: st.cf_token_set ? 'saved (paste to replace)' : 'eyJh…' });
+    const extra = h('div');
+    const seg = h('div', { class: 'choices' });
+    const paint = () => {
+      seg.replaceChildren(...MODES.map(([k, l, d]) => h('button', { type: 'button', class: 'choice', 'aria-pressed': k === mode, onclick: () => { mode = k; paint(); } }, h('b', {}, l), h('span', {}, d))));
+      extra.replaceChildren(...(mode === 'token' ? [
+        h('ol', { class: 'steps' },
+          h('li', {}, 'In Cloudflare Zero Trust: Networks → Tunnels → Create a tunnel (Cloudflared).'),
+          h('li', {}, 'Copy the token from the install command (the long text after ', h('span', { class: 'mono' }, '--token'), ') and paste it below.'),
+          h('li', {}, 'Add a public hostname (e.g. mcp.yourdomain.com) with service ', h('span', { class: 'mono' }, `http://localhost:${P.port}`), '.')),
+        ...field('Tunnel token', tok), ...field('Its public address', url)]
+        : mode === 'url' ? [h('p', { class: 'muted' }, 'Point your proxy at this gateway’s port 8000 (the MCP addresses live at /mcp/…), then enter its https address:'), ...field('Public HTTPS address', url)] : []));
+    };
+    paint();
+    const status = P.mode === 'off' ? null : h('div', { class: 'status ' + (P.state === 'up' ? 'good' : P.state === 'starting' ? 'warn' : 'bad') },
+      P.state === 'up' ? ['Live at ', h('span', { class: 'mono' }, P.url)] : P.state === 'starting' ? 'Starting the tunnel…' : (P.error || 'Not working'));
+    if (P.state === 'starting') setTimeout(() => { if (tab === 'devices') show(); }, 2500);
+    return h('div', { class: 'card hero' },
+      h('h3', {}, 'HTTPS address for your MCP servers'),
+      h('p', { class: 'muted' }, 'Claude and most AI apps only connect to MCP servers over https://. Only the MCP addresses go through this, never this page or the API.'),
+      status, seg, extra,
+      h('div', { class: 'row', style: 'margin-top:10px' },
+        h('button', { class: 'b p', type: 'button', onclick: act(async () => {
+          const j = { public_mode: mode };
+          if (mode === 'url' || mode === 'token') j.public_url = url.value;
+          if (tok.value.trim()) j.cf_token = tok.value.trim();
+          await api('public', { method: 'PUT', json: j }); toast(mode === 'off' ? 'HTTPS address off' : 'Saved'); show();
+        }) }, 'Save'),
+        P.log && P.log.length ? h('details', {}, h('summary', { class: 'muted' }, 'Tunnel log'), h('pre', { class: 'term' }, P.log.join('\n'))) : null));
+  }
 
   function haSetup(M) {
     if (M.ha_locked) return h('div', { class: 'note' }, 'Home Assistant isn’t answering. If this is the add-on, restart it after updating.');
@@ -1001,7 +1123,8 @@ window.__hbAddon = "personal_ai_gateway";
       h('div', { class: 'row sp' }, h('h3', {}, lamp(light), srv.name, ...chips),
         h('button', { class: 'b', type: 'button', onclick: act(async () => { await api('mcp/servers', { method: 'POST', json: { id: srv.id, enabled: !srv.enabled } }); show(); }) }, srv.enabled ? 'Turn off' : 'Turn on')),
       st.error ? h('div', { class: 'note err mono' }, st.error) : null,
-      h('p', { class: 'muted', style: 'margin:4px 0' }, 'MCP address (keep it private, it works like a password):'), urlBox,
+      h('p', { class: 'muted', style: 'margin:4px 0' }, M.pub ? 'HTTPS address (keep it private, it works like a password):' : 'MCP address (keep it private, it works like a password):'), urlBox,
+      M.pub ? h('p', { class: 'muted', style: 'margin:4px 0 0;font-size:.8rem' }, 'On your network you can also use ', h('span', { class: 'mono' }, `${M.lanBase}/mcp/••••`), '.') : null,
       h('div', { class: 'row', style: 'margin-top:8px' },
         h('button', { class: 'b', type: 'button', onclick: () => copy(url) }, 'Copy address'),
         h('button', { class: 'b', type: 'button', onclick: () => { shown.v = !shown.v; paintUrl(); } }, 'Show'),
@@ -1232,6 +1355,26 @@ window.__hbAddon = "personal_ai_gateway";
 
   // ------------------------------------------------------------ chat playground
   async function chatTab(root) {
+    const O = S.open_webui || {};
+    if (O.installed) {
+      const url = O.url || (O.port ? `${location.protocol === 'https:' ? 'http:' : location.protocol}//${location.hostname}:${O.port}` : '');
+      const canEmbed = url && !(location.protocol === 'https:' && url.startsWith('http:'));
+      root.append(h('div', { class: 'card hero' },
+        h('div', { class: 'row sp' }, h('h3', {}, lamp(O.running ? 'ready' : 'off'), 'Open WebUI'),
+          url && O.running ? h('a', { class: 'b p', href: url, target: '_blank', rel: 'noopener' }, 'Open in a new tab ↗') : null),
+        !O.running ? h('p', { class: 'muted' }, 'The Open WebUI add-on is installed but not running. Start it from its add-on page.')
+          : !url ? h('p', { class: 'muted' }, 'Give the Open WebUI add-on a port on its Configuration → Network section to open it here.')
+          : h('p', { class: 'muted' }, 'Already connected to this gateway: every model and route here shows up in it. The first account you create there is the admin.')),
+        O.running && canEmbed ? h('iframe', { class: 'owui', src: url, title: 'Open WebUI', allow: 'clipboard-write; microphone' }) : null,
+        O.running && url && !canEmbed ? h('p', { class: 'muted' }, 'Home Assistant is on https and Open WebUI on http, so the browser won’t show it inside this page. Use the button above.') : null);
+    } else if (S.addon) {
+      root.append(h('div', { class: 'card hero' }, h('h3', {}, 'Get a full chat app'),
+        h('p', { class: 'muted' }, 'Install the ', h('b', {}, 'Open WebUI'), ' add-on from this same add-on repository. It connects to this gateway by itself (no keys to copy) and gives you a ChatGPT-style app with history, file uploads and every model here.'),
+        O.slug ? h('button', { class: 'b p', type: 'button', onclick: () => { window.top.location.href = '/hassio/addon/' + O.slug + '/info'; } }, 'Open the Open WebUI add-on page') : null));
+    }
+    const quick = h('div');
+    root.append(O.installed ? h('details', { class: 'card' }, h('summary', {}, h('b', {}, 'Quick test chat')), quick) : quick);
+    root = quick;
     const { models: all } = await api('all-models');
     const sel = h('select', {}, all.map(m => h('option', { value: m.id }, m.id)));
     sel.value = sessionStorage.getItem('gw-model') && all.some(m => m.id === sessionStorage.getItem('gw-model')) ? sessionStorage.getItem('gw-model') : (all[0]?.id || '');
@@ -1275,9 +1418,8 @@ window.__hbAddon = "personal_ai_gateway";
           h('button', { class: 'b d', type: 'button', onclick: act(async () => { if (!confirm('Create a new key? Apps using the old one will stop working.')) return; const r = await api('proxy-key/regenerate', { method: 'POST' }); sessionStorage.setItem('gw-token', r.proxy_key); toast('New key created'); show(); }) }, 'Generate a new key'))),
       h('div', { class: 'card' }, h('h3', {}, 'Key rotation'),
         ...field('Default mode', rot), ...field('Rest times after repeated failures (seconds, in order)', cool), ...field('Wait for a provider (seconds)', to)),
-      h('div', { class: 'card' }, h('h3', {}, 'Local models (Ollama)'),
-        S.bundled ? h('p', { class: 'muted' }, 'Ollama is built into this add-on and runs on this machine’s CPU. Use 127.0.0.1:11434 below, or any other Ollama you have.') : null,
-        S.bundled ? h('button', { class: 'b', type: 'button', onclick: () => { ou.value = 'http://127.0.0.1:11434'; toast('Press Save settings to apply'); } }, 'Use the built-in Ollama') : null,
+      h('details', { class: 'card', open: S.ollama.configured || null }, h('summary', {}, h('b', {}, 'Ollama (optional)'), h('span', { class: 'muted' }, S.ollama.configured ? ' · ' + S.ollama.url : ' · not used')),
+        h('p', { class: 'muted' }, 'Only if you run Ollama somewhere (another PC, a NAS…). Leave the address empty and nothing about Ollama shows up anywhere.'),
         ...field(locked('ollama_url') ? 'Ollama address (set by the OLLAMA_URL environment variable)' : 'Ollama address (LAN address of the machine running Ollama)', ou),
         h('button', { class: 'b', type: 'button', onclick: act(async () => { const r = await api('ollama/test', { method: 'POST', json: { url: ou.value } }); r.ok ? toast('Connected: Ollama ' + r.version) : toast(r.error, true); }) }, 'Test connection'),
         ...field(locked('ollama_preload') ? 'Download on start (set by the OLLAMA_PRELOAD environment variable)' : 'Download on start (comma-separated names)', pre)),

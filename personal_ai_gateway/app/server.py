@@ -18,14 +18,17 @@ from pathlib import Path
 from aiohttp import ClientSession, ClientTimeout, FormData, web
 
 from accounts import ACCOUNTS, Accounts
-from hub import Hub, OllamaError, run_bundled
+import socket
+
+from hub import Hub, OllamaError
 from machines import Machines, UpstreamError
 from mcp import HA, Devices, HAError
 from rotator import KeyPool, kid
 from store import DATA_DIR, PRESETS, Store
+from tunnel import Tunnel
 from upstream import Gateway, err, sanitize
 
-VERSION = "1.8.0"
+VERSION = "2.0.0"
 TEST_MODELS = {"gemini": "gemini-2.5-flash", "openai": "gpt-4o-mini", "groq": "llama-3.3-70b-versatile",
                "mistral": "mistral-small-latest", "deepseek": "deepseek-chat", "cerebras": "llama3.1-8b"}
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -39,6 +42,7 @@ GW: Gateway
 HUB: Hub
 ACC: Accounts
 DEV: Devices
+TUN: Tunnel
 START = time.time()
 
 
@@ -55,7 +59,7 @@ async def middleware(request, handler):
         else:
             auth = request.headers.get("Authorization", "")
             sent = auth[7:] if auth.lower().startswith("bearer ") else request.headers.get("x-api-key", "")
-            if not secret_ok(sent, STORE.proxy_key):
+            if not (secret_ok(sent, STORE.proxy_key) or secret_ok(sent, STORE.data.get("openwebui_key", ""))):
                 resp = err(401, "Invalid API key. Use the proxy key shown in the gateway's Settings.", "invalid_api_key")
             else:
                 try:
@@ -156,8 +160,8 @@ async def api_state(request):
         "version": VERSION, "uptime_s": int(time.time() - START), "proxy_key": STORE.proxy_key,
         "providers": providers, "routes": STORE.data["routes"], "settings": STORE.settings(),
         "presets": {k: v for k, v in PRESETS.items()}, "recent": list(GW.recent)[:30],
-        "ollama": await HUB.status(), "addon": bool(INGRESS_IP), "bundled": STORE.bundled_enabled(),
-        "disk_free": shutil.disk_usage(DATA_DIR).free if STORE.bundled_enabled() else None,
+        "ollama": await HUB.status(), "addon": bool(INGRESS_IP), "bundled": False, "disk_free": None,
+        "public": TUN.info(), "open_webui": await open_webui_info(request.app["session"]),
         "env_locked": [k for k, e in (("ollama_url", "OLLAMA_URL"), ("ollama_preload", "OLLAMA_PRELOAD"))
                        if os.environ.get(e, "").strip()],
     })
@@ -439,6 +443,70 @@ async def mcp_endpoint(request):
     return await DEV.handle(request)
 
 
+async def api_public(request):
+    b = await request.json()
+    STORE.set_settings({k: b[k] for k in ("public_mode", "public_url", "cf_token") if k in b})
+    await TUN.apply()
+    await asyncio.sleep(0.2)
+    return web.json_response(TUN.info())
+
+
+async def api_public_status(request):
+    return web.json_response(TUN.info())
+
+
+# -- Open WebUI (the chat add-on next to this one)
+SHARE = Path("/share/personal_ai_gateway")
+_owui = {"t": 0.0, "v": None}
+
+
+def write_connection() -> None:
+    """Tell the Open WebUI add-on how to reach this gateway (it maps /share read-only)."""
+    if not Path("/share").is_dir():
+        return
+    try:
+        SHARE.mkdir(parents=True, exist_ok=True)
+        f = SHARE / "connection.json"
+        f.write_text(json.dumps({
+            "base_url": f"http://{socket.gethostname()}:{int(os.environ.get('PORT', '8000'))}/v1",
+            "api_key": STORE.data["openwebui_key"], "written_by": f"Personal AI Gateway {VERSION}"}, indent=2))
+        os.chmod(f, 0o600)
+    except OSError as e:
+        log.warning("Couldn't write the Open WebUI connection file: %s", e)
+
+
+async def open_webui_info(session) -> dict:
+    """Is the Open WebUI add-on installed/running, and on which port?"""
+    url = os.environ.get("OPEN_WEBUI_URL", "").strip()
+    port = os.environ.get("OPEN_WEBUI_PORT", "").strip()
+    if url or port.isdigit():  # Docker: set by docker-compose next to the open-webui service
+        return {"installed": True, "running": True, "url": url, "port": int(port) if port.isdigit() else None}
+    tok = os.environ.get("SUPERVISOR_TOKEN")
+    if not tok:
+        return {"installed": False}
+    if _owui["v"] is not None and time.time() - _owui["t"] < 20:
+        return _owui["v"]
+    out = {"installed": False}
+    hdr = {"Authorization": f"Bearer {tok}"}
+    try:
+        async with session.get("http://supervisor/addons/self/info", headers=hdr, timeout=ClientTimeout(total=5)) as r:
+            me = (await r.json()).get("data") or {}
+        sibling = str(me.get("slug", "")).rsplit("personal_ai_gateway", 1)[0] + "open_webui"
+        async with session.get(f"http://supervisor/addons/{sibling}/info", headers=hdr, timeout=ClientTimeout(total=5)) as r:
+            if r.status == 200:
+                d = (await r.json()).get("data") or {}
+                if d.get("version"):
+                    port = (d.get("network") or {}).get("8080/tcp")
+                    out = {"installed": True, "running": d.get("state") == "started", "port": port, "url": "",
+                           "slug": sibling, "version": d.get("version")}
+                else:
+                    out = {"installed": False, "available": True, "slug": sibling}
+    except Exception as e:  # noqa: BLE001
+        out = {"installed": False, "error": str(e)[:120]}
+    _owui.update(t=time.time(), v=out)
+    return out
+
+
 async def index(request):
     return web.FileResponse(APP_DIR / "ui" / "index.html", headers={"Cache-Control": "no-store"})
 
@@ -455,9 +523,24 @@ async def background(app):
             await asyncio.sleep(30)
             POOL.save()
     tasks = [asyncio.create_task(saver()), asyncio.create_task(HUB.preload())]
-    if STORE.bundled_enabled():
-        tasks.append(asyncio.create_task(run_bundled(STORE)))
+    old = DATA_DIR / "ollama"  # models from the built-in Ollama that this add-on no longer has
+    if old.is_dir():
+        def wipe():
+            size = sum(f.stat().st_size for f in old.rglob("*") if f.is_file())
+            shutil.rmtree(old, ignore_errors=True)
+            log.info("Removed the old built-in Ollama folder (%s freed)", f"{size / 1e9:.1f} GB")
+        tasks.append(asyncio.create_task(asyncio.to_thread(wipe)))
+    write_connection()
+    try:
+        mcp_runner = await Tunnel.start_listener(mcp_endpoint)
+    except OSError as e:  # the HTTPS tunnel can't work, but everything else still should
+        mcp_runner = None
+        log.error("MCP-only listener for the HTTPS tunnel failed to start: %s", e)
+    await TUN.apply()
     yield
+    await TUN.stop()
+    if mcp_runner:
+        await mcp_runner.cleanup()
     for t in tasks:
         t.cancel()
     await DEV.machines.close()
@@ -471,6 +554,8 @@ async def make_app() -> web.Application:
     POOL = KeyPool(DATA_DIR / "usage.json", STORE.setting("cooldowns"))
     session = ClientSession(timeout=ClientTimeout(total=None))
     GW, HUB = Gateway(STORE, POOL, session), Hub(STORE, session)
+    global TUN
+    TUN = Tunnel(STORE)
     ACC = Accounts(STORE, int(os.environ.get("PORT", "8000")))
     GW.accounts = ACC
     DEV = Devices(STORE, HA(STORE, session), on_change=ACC.configure_mcp)
@@ -530,6 +615,7 @@ async def make_app() -> web.Application:
         web.post("/api/mcp/computers/{cid}/test", api_computer_test),
         web.post("/api/mcp/computers/{cid}/install-key", api_computer_key),
         web.post("/api/mcp/computers/{cid}/forget-host", api_computer_forget),
+        web.put("/api/public", api_public), web.get("/api/public", api_public_status),
         web.route("*", "/mcp", mcp_endpoint),
         web.route("*", "/mcp/{key}", mcp_endpoint),
     ])

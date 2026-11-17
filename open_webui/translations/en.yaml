@@ -1,0 +1,16 @@
+configuration:
+  require_login:
+    name: Require sign-in
+    description: >-
+      Ask for an account before chatting. The first account you create becomes the admin.
+      Recommended, since the chat is reachable from your network. Can't be turned off once accounts exist.
+  gateway_url:
+    name: Gateway address (optional)
+    description: >-
+      Leave empty: it finds the Personal AI Gateway add-on by itself. Otherwise the gateway's
+      OpenAI address, e.g. http://192.168.1.10:8000/v1
+  api_key:
+    name: Gateway key (optional)
+    description: Leave empty when the gateway is an add-on on this Home Assistant. Otherwise the gateway's proxy key.
+network:
+  8080/tcp: Open WebUI (chat app)

@@ -1,11 +1,9 @@
-# Personal AI Gateway + its own Ollama, as one stack. Nothing else to set up.
-#   1. cp .env.example .env     (optional: add API keys, set PROXY_API_KEY)
+# Personal AI Gateway + Open WebUI (chat), as one stack.
+#   1. cp .env.example .env and set PROXY_API_KEY (any long random text), plus any API keys
 #   2. docker compose up -d
-#   3. open http://<this-machine>:8000, sign in with the proxy key
-#      (printed in `docker compose logs gateway`, also in the page's Settings), then
-#      Models -> Find & download.
+#   3. gateway: http://<this-machine>:8000 (sign in with the proxy key)
+#      chat:    http://<this-machine>:3000 (the first account you create is the admin)
 # Update:  docker compose pull && docker compose up -d
-#   (if the pull is denied because the image is private, use: docker compose up -d --build)
 services:
   gateway:
     build:
@@ -21,46 +19,35 @@ services:
       - path: .env
         required: false
     environment:
-      # Where models are downloaded and run: the bundled Ollama below. You can change it
-      # in the page (Settings) or in .env with OLLAMA_URL to use an Ollama elsewhere.
-      OLLAMA_DEFAULT_URL: http://ollama:11434
-      # Devices tab (MCP servers for your Home Assistant devices): your HA address and a
-      # long-lived access token (HA profile > Security). You can also type them in the page.
+      OPEN_WEBUI_PORT: "3000"   # lets the gateway's Chat tab open Open WebUI
+      # Optional: an Ollama you already run somewhere (nothing about Ollama shows without it).
+      # OLLAMA_URL: http://192.168.1.50:11434
+      # MCP tab, Home Assistant devices: your HA address and a long-lived access token.
       # HA_URL: http://homeassistant.local:8123
       # HA_TOKEN: your-long-lived-token
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    depends_on:
-      ollama:
-        condition: service_healthy
     volumes:
-      - ./data:/data   # providers, keys you add in the page, usage counters
+      - ./data:/data   # providers, keys you add in the page, MCP servers, usage counters
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: gateway_ollama
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: gateway_open_webui
     restart: unless-stopped
+    ports:
+      - "3000:8080"
     environment:
-      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-5m}   # how long a model stays in memory after use
+      OPENAI_API_BASE_URL: http://gateway:8000/v1
+      OPENAI_API_KEY: ${PROXY_API_KEY:?Set PROXY_API_KEY in .env so Open WebUI can use the gateway}
+      ENABLE_OLLAMA_API: "False"
+      WEBUI_NAME: AI Gateway Chat
+      SCARF_NO_ANALYTICS: "true"
+      DO_NOT_TRACK: "true"
+      ANONYMIZED_TELEMETRY: "false"
     volumes:
-      - ollama_data:/root/.ollama   # downloaded models live here
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 5s
-    # Reach Ollama directly from other machines or apps: uncomment (it has no password).
-    # ports:
-    #   - "11434:11434"
-    # NVIDIA GPU (needs the NVIDIA container toolkit): uncomment
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
+      - open_webui:/app/backend/data   # chats, users, settings
+    depends_on:
+      - gateway
 
 volumes:
-  ollama_data:
+  open_webui:
