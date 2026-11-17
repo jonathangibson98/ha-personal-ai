@@ -1,9 +1,10 @@
 # Personal AI Gateway as a normal Docker container (no Home Assistant add-on needed).
 FROM python:3.12-alpine
 # Node.js runs the official Claude / ChatGPT (Codex) / Gemini sign-in tools, installed on demand into /data.
-RUN apk add --no-cache nodejs npm git ripgrep libgcc libstdc++ bash \
+RUN apk add --no-cache nodejs npm git ripgrep libgcc libstdc++ bash openssh-client openssh-keygen sshpass \
     && adduser -S -D -h /var/lib/aicli -s /sbin/nologin aicli \
     && pip install --no-cache-dir "aiohttp>=3.9,<4"
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 COPY app /app
 ENV DATA_DIR=/data PYTHONUNBUFFERED=1 PORT=8000
 VOLUME /data

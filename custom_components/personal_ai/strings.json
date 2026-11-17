@@ -508,7 +508,7 @@
       },
       "ai_server": {
         "title": "Device access for signed-in accounts",
-        "description": "Which MCP server the Claude, ChatGPT and Gemini accounts may use when you chat with them.",
+        "description": "Which MCP server the Claude, ChatGPT and Gemini accounts may use when you chat with them. This replaces the current choice; to give them several (for example your devices and a computer), tick them on the gateway page's MCP tab.",
         "data": {
           "server": "MCP server"
         }

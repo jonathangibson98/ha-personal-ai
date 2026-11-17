@@ -130,7 +130,7 @@ details.dev summary::-webkit-details-marker{display:none}
   const lamp = s => h('span', { class: 'lamp ' + s, title: s });
   const field = (label, input) => [h('label', { class: 'f' }, label), input];
 
-  const TABS = [['overview', 'Overview'], ['providers', 'Providers'], ['models', 'Models'], ['routes', 'Routes'], ['devices', 'Devices'], ['chat', 'Chat'], ['settings', 'Settings']];
+  const TABS = [['overview', 'Overview'], ['providers', 'Providers'], ['models', 'Models'], ['routes', 'Routes'], ['devices', 'MCP'], ['chat', 'Chat'], ['settings', 'Settings']];
   function drawNav() {
     $('#nav').replaceChildren(...TABS.map(([id, label]) =>
       h('button', { type: 'button', 'aria-current': id === tab ? 'page' : null, onclick: () => { tab = id; show(); } }, label)));
@@ -330,56 +330,123 @@ details.dev summary::-webkit-details-marker{display:none}
     poll = setInterval(async () => { try { paint(await api('sessions/' + sess.id)); } catch (e) { clearInterval(poll); } }, 1200);
   }
 
-  // ------------------------------------------------------------ devices (MCP servers)
+  // ------------------------------------------------------------ MCP servers (devices, computers, commands, remote)
+  const KIND = { ha: 'Home Assistant devices', computer: 'Computer (SSH)', command: 'Command (stdio MCP)', remote: 'Remote MCP URL' };
+  const ACCESS = [['read', 'Look only'], ['files', 'Read & write files'], ['full', 'Full control']];
   async function devices(root) {
     const M = await api('mcp');
     const base = sid => { const k = M.servers.find(s => s.id === sid)?.key || ''; return `${location.protocol}//${location.hostname}:${M.port}/mcp/${k}`; };
-    const aiSel = h('select', {}, [h('option', { value: '' }, 'No device access'), ...M.servers.map(s => h('option', { value: s.id, selected: s.id === M.ai_server }, s.name))]);
-    aiSel.onchange = act(async () => { await api('mcp/settings', { method: 'PUT', json: { ai_server: aiSel.value } }); toast('Saved'); });
-    const newName = h('input', { placeholder: 'Name, e.g. Living room, Everything, Guest' });
+    const picks = new Set(M.ai_servers || []);
+    const aiBox = h('div', {}, M.servers.length ? M.servers.map(s => {
+      const cb = h('input', { type: 'checkbox', checked: picks.has(s.id) });
+      cb.onchange = () => cb.checked ? picks.add(s.id) : picks.delete(s.id);
+      return h('label', { class: 'row', style: 'margin:4px 0' }, cb, s.name, h('span', { class: 'chip' }, KIND[s.kind || 'ha']));
+    }) : h('p', { class: 'muted' }, 'Make an MCP server first.'));
+    const kindSel = h('select', {}, Object.entries(KIND).map(([k, l]) => h('option', { value: k }, l)));
+    const newName = h('input', { placeholder: 'Name, e.g. Garage Pi, Laptop, Living room, GitHub' });
     root.append(...[
-      h('p', { class: 'muted' }, 'Make an MCP server that can only see the devices you pick. Paste its address into any AI app that supports MCP (Claude, ChatGPT, Gemini CLI, Cursor…). Each device can be hidden, visible, or controllable.'),
-      !M.ha_connected ? haSetup(M) : null,
-      M.ha_connected && !M.ha_locked ? h('details', {}, h('summary', { class: 'muted' }, 'Home Assistant connection'), haSetup(M)) : null,
+      h('p', { class: 'muted' }, 'Each MCP server has its own private address and only gives an AI what you allow: Home Assistant devices, a computer over SSH (your other Pi, your laptop...), any MCP server you run as a command, or another MCP server’s URL. Paste the address into any app that supports MCP (Claude, ChatGPT, Gemini CLI, Cursor…).'),
+      !M.ha_connected && M.servers.some(s => (s.kind || 'ha') === 'ha') ? haSetup(M) : null,
+      !M.ha_locked && (M.ha_connected || !M.servers.some(s => (s.kind || 'ha') === 'ha')) ? h('details', {}, h('summary', { class: 'muted' }, 'Home Assistant connection'), haSetup(M)) : null,
       h('div', { class: 'card' }, h('h3', {}, 'Signed-in AIs'),
-        h('p', { class: 'muted' }, 'Which device list the Claude, ChatGPT and Gemini accounts signed in here may use when you chat with them (including through Home Assistant).'), aiSel),
+        h('p', { class: 'muted' }, 'Which MCP servers the Claude, ChatGPT and Gemini accounts signed in here may use when you chat with them (including through Home Assistant).'), aiBox,
+        M.servers.length ? h('button', { class: 'b p', type: 'button', style: 'margin-top:6px', onclick: act(async () => { await api('mcp/settings', { method: 'PUT', json: { ai_servers: [...picks] } }); toast('Saved'); show(); }) }, 'Save') : null),
+      computersCard(M),
       ...M.servers.map(srv => serverCard(srv, base(srv.id), M)),
-      h('div', { class: 'card' }, h('h3', {}, 'New MCP server'), h('div', { class: 'row' }, h('div', { class: 'grow' }, newName),
-        h('button', { class: 'b p', type: 'button', disabled: !M.ha_connected, onclick: act(async () => { const srv = await api('mcp/servers', { method: 'POST', json: { name: newName.value || 'Devices' } }); openPicker = srv.id; show(); }) }, 'Create'))),
-      M.calls.length ? h('div', {}, h('h2', {}, 'Recent device actions'), h('div', { class: 'card' }, ...M.calls.map(c =>
+      h('div', { class: 'card' }, h('h3', {}, 'New MCP server'), ...field('Kind', kindSel), ...field('Name', newName),
+        h('button', { class: 'b p', type: 'button', style: 'margin-top:8px', onclick: act(async () => {
+          if (kindSel.value === 'ha' && !M.ha_connected) throw new Error('Connect Home Assistant first.');
+          const srv = await api('mcp/servers', { method: 'POST', json: { name: newName.value, kind: kindSel.value, ...(kindSel.value === 'computer' && M.computers.length === 1 ? { computer: M.computers[0].id } : {}) } });
+          openPicker = srv.id; show();
+        }) }, 'Create')),
+      M.calls.length ? h('div', {}, h('h2', {}, 'Recent actions'), h('div', { class: 'card' }, ...M.calls.map(c =>
         h('div', { class: 'keyrow' }, h('span', { class: 'mono grow' }, `${c.action} → ${c.entity_id}`), h('span', { class: 'muted' }, `${c.server} · ${ago(c.t)} ago`))))) : null].filter(Boolean));
   }
-  let openPicker = '';
+  let openPicker = '', editComputer = null;
 
   function haSetup(M) {
     if (M.ha_locked) return h('div', { class: 'note' }, 'Home Assistant isn’t answering. If this is the add-on, restart it after updating.');
     const url = h('input', { value: M.ha_url, placeholder: 'http://homeassistant.local:8123' }), tok = h('input', { type: 'password', placeholder: M.ha_token_set ? '(saved, type to replace)' : 'Long-lived access token' });
     return h('div', { class: 'card' }, h('h3', {}, 'Connect Home Assistant'),
-      h('p', { class: 'muted' }, 'Not needed in the add-on. For a plain Docker install: in Home Assistant open your profile > Security > Long-lived access tokens > Create token.'),
+      h('p', { class: 'muted' }, 'Only needed for Home Assistant device servers, and not in the add-on. For a plain Docker install: in Home Assistant open your profile > Security > Long-lived access tokens > Create token.'),
       ...field('Home Assistant address', url), ...field('Access token', tok),
       h('button', { class: 'b p', type: 'button', style: 'margin-top:8px', onclick: act(async () => { const j = { ha_url: url.value }; if (tok.value) j.ha_token = tok.value; await api('mcp/settings', { method: 'PUT', json: j }); toast('Saved'); show(); }) }, 'Save'));
   }
 
+  // -- computers the gateway can SSH into
+  function computersCard(M) {
+    const key = M.public_key || '';
+    const cmd = `mkdir -p ~/.ssh && echo '${key}' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`;
+    const out = h('div');
+    const e = editComputer || {};
+    const name = h('input', { value: e.name || '', placeholder: 'Garage Pi' }), host = h('input', { value: e.host || '', placeholder: '192.168.1.20 or laptop.tailnet.ts.net' });
+    const user = h('input', { value: e.user || '', placeholder: 'pi' }), port = h('input', { value: e.port || 22, inputmode: 'numeric' });
+    const result = (r, where) => where.replaceChildren(h('div', { class: r.ok ? 'note' : 'note err' }, r.ok ? `Connected ✓ ${r.reply || ''}${r.ms ? ` (${r.ms} ms)` : ''}` : r.error || 'Failed'));
+    const rows = M.computers.map(c => {
+      const res = h('div');
+      return h('div', { class: 'keyrow', style: 'display:block' },
+        h('div', { class: 'row sp' }, h('span', {}, h('b', {}, c.name), ' ', h('span', { class: 'mono muted' }, `${c.user}@${c.host}${+c.port !== 22 ? ':' + c.port : ''}`)),
+          h('span', { class: 'row' },
+            h('button', { class: 'b', type: 'button', onclick: act(async () => { res.replaceChildren(h('p', { class: 'muted' }, 'Connecting…')); result(await api(`mcp/computers/${c.id}/test`, { method: 'POST' }), res); }) }, 'Test'),
+            h('button', { class: 'b', type: 'button', onclick: act(async () => {
+              const pw = prompt(`Password for ${c.user}@${c.host} (used once to add the gateway's key, not saved)`); if (!pw) return;
+              res.replaceChildren(h('p', { class: 'muted' }, 'Adding the key…')); result(await api(`mcp/computers/${c.id}/install-key`, { method: 'POST', json: { password: pw } }), res);
+            }) }, 'Set up with password'),
+            h('button', { class: 'b', type: 'button', onclick: () => { editComputer = c; show(); } }, 'Edit'),
+            h('button', { class: 'b', type: 'button', title: 'Use after reinstalling that computer', onclick: act(async () => { await api(`mcp/computers/${c.id}/forget-host`, { method: 'POST' }); toast('Forgot its fingerprint'); }) }, 'Forget fingerprint'),
+            h('button', { class: 'b d', type: 'button', onclick: act(async () => { if (!confirm(`Delete ${c.name}?`)) return; await api('mcp/computers/' + c.id, { method: 'DELETE' }); show(); }) }, 'Delete'))),
+        res);
+    });
+    return h('div', { class: 'card' }, h('h3', {}, 'Computers (SSH)'),
+      h('p', { class: 'muted' }, 'Computers the gateway can reach over SSH: another Pi, your laptop, a NAS, or this Home Assistant itself through the SSH add-on. Then make a “Computer” or “Command” MCP server that uses one.'),
+      ...rows, out,
+      h('details', { open: !!editComputer || !M.computers.length }, h('summary', { class: 'muted' }, editComputer ? `Edit ${e.name}` : 'Add a computer'),
+        ...field('Name', name), ...field('Address (IP or host name)', host),
+        h('div', { class: 'row' }, h('div', { class: 'grow' }, ...field('User name', user)), h('div', { style: 'width:90px' }, ...field('Port', port))),
+        h('div', { class: 'row', style: 'margin-top:8px' },
+          h('button', { class: 'b p', type: 'button', onclick: act(async () => { await api('mcp/computers', { method: 'POST', json: { id: e.id, name: name.value, host: host.value, user: user.value, port: +port.value || 22 } }); editComputer = null; toast('Saved'); show(); }) }, 'Save computer'),
+          editComputer ? h('button', { class: 'b', type: 'button', onclick: () => { editComputer = null; show(); } }, 'Cancel') : null)),
+      h('details', {}, h('summary', { class: 'muted' }, 'The gateway’s SSH key (add it to a computer by hand)'),
+        h('p', { class: 'muted' }, 'Easiest: press “Set up with password” on the computer. Or run this once on that computer as the user you’ll connect with:'),
+        h('div', { class: 'mono' }, cmd),
+        h('div', { class: 'row', style: 'margin-top:6px' }, h('button', { class: 'b', type: 'button', onclick: () => copy(cmd) }, 'Copy command'), h('button', { class: 'b', type: 'button', onclick: () => copy(key) }, 'Copy key only')),
+        h('p', { class: 'muted' }, 'Home Assistant OS itself: in the “Advanced SSH & Web Terminal” add-on, put the key under authorized_keys, then add a computer with user root (or hassio) and the add-on’s port.')));
+  }
+
   function serverCard(srv, url, M) {
+    const kind = srv.kind || 'ha';
     const shown = { v: false };
     const urlBox = h('div', { class: 'mono' });
     const paintUrl = () => urlBox.textContent = shown.v ? url : url.replace(srv.key, '••••••••');
     paintUrl();
     const picker = h('div');
-    const count = Object.keys(srv.devices).length + Object.keys(srv.entities).length;
+    const count = kind === 'ha' ? Object.keys(srv.devices || {}).length + Object.keys(srv.entities || {}).length : 0;
+    const comp = M.computers.find(c => c.id === (kind === 'computer' ? srv.computer : srv.run_on));
+    const chips = [h('span', { class: 'chip' }, KIND[kind])];
+    if (kind === 'ha') chips.push(h('span', { class: 'chip' }, `${count} picked`));
+    if (kind === 'computer') chips.push(h('span', { class: 'chip' }, (ACCESS.find(a => a[0] === srv.access) || ACCESS[0])[1]));
+    if (comp) chips.push(h('span', { class: 'chip' }, comp.name));
+    if ((M.ai_servers || []).includes(srv.id)) chips.push(h('span', { class: 'chip' }, 'used by signed-in AIs'));
+    const st = srv.status || {};
+    const light = !srv.enabled ? 'off' : st.error ? 'locked' : 'ready';
     const card = h('div', { class: 'card' },
-      h('div', { class: 'row sp' }, h('h3', {}, lamp(srv.enabled ? 'ready' : 'off'), srv.name, h('span', { class: 'chip' }, `${count} picked`), srv.id === M.ai_server ? h('span', { class: 'chip' }, 'used by signed-in AIs') : null),
+      h('div', { class: 'row sp' }, h('h3', {}, lamp(light), srv.name, ...chips),
         h('button', { class: 'b', type: 'button', onclick: act(async () => { await api('mcp/servers', { method: 'POST', json: { id: srv.id, enabled: !srv.enabled } }); show(); }) }, srv.enabled ? 'Turn off' : 'Turn on')),
+      st.error ? h('div', { class: 'note err mono' }, st.error) : null,
       h('p', { class: 'muted', style: 'margin:4px 0' }, 'MCP address (keep it private, it works like a password):'), urlBox,
       h('div', { class: 'row', style: 'margin-top:8px' },
         h('button', { class: 'b', type: 'button', onclick: () => copy(url) }, 'Copy address'),
         h('button', { class: 'b', type: 'button', onclick: () => { shown.v = !shown.v; paintUrl(); } }, 'Show'),
-        h('button', { class: 'b p', type: 'button', onclick: act(async () => { openPicker = openPicker === srv.id ? '' : srv.id; await drawPicker(); }) }, 'Choose devices'),
+        h('button', { class: 'b p', type: 'button', onclick: act(async () => { openPicker = openPicker === srv.id ? '' : srv.id; await drawPicker(); }) }, kind === 'ha' ? 'Choose devices' : 'Settings & tools'),
         h('button', { class: 'b', type: 'button', onclick: act(async () => { if (!confirm('Make a new address? Apps using the old one stop working.')) return; await api(`mcp/servers/${srv.id}/regenerate`, { method: 'POST' }); show(); }) }, 'New address'),
         h('button', { class: 'b d', type: 'button', onclick: act(async () => { if (!confirm(`Delete ${srv.name}?`)) return; await api('mcp/servers/' + srv.id, { method: 'DELETE' }); show(); }) }, 'Delete')),
       picker);
-    async function drawPicker() {
+    const drawPicker = async () => {
       if (openPicker !== srv.id) return picker.replaceChildren();
+      if (kind === 'ha') return drawDevicePicker();
+      picker.replaceChildren(kindSettings(srv, M));
+    };
+    async function drawDevicePicker() {
       picker.replaceChildren(h('p', { class: 'muted' }, 'Loading your devices…'));
       const cat = await api('mcp/catalog');
       const dev = { ...srv.devices }, ent = { ...srv.entities };
@@ -426,6 +493,65 @@ details.dev summary::-webkit-details-marker{display:none}
     }
     drawPicker().catch(e => toast(e.message, true));
     return card;
+  }
+
+  // -- settings for computer / command / remote servers, plus the tool list
+  function kindSettings(srv, M) {
+    const kind = srv.kind, body = h('div', { style: 'margin-top:10px' }), spec = {};
+    const name = h('input', { value: srv.name });
+    body.append(...field('Name', name));
+    const compOpts = sel => M.computers.map(c => h('option', { value: c.id, selected: c.id === sel }, `${c.name} (${c.user}@${c.host})`));
+    if (kind === 'computer') {
+      if (!M.computers.length) body.append(h('div', { class: 'note' }, 'Add a computer under “Computers (SSH)” above first.'));
+      const comp = h('select', {}, h('option', { value: '' }, 'Pick a computer'), ...compOpts(srv.computer));
+      let access = srv.access || 'read';
+      const seg = h('span', { class: 'seg' });
+      const drawSeg = () => seg.replaceChildren(...ACCESS.map(([v, l]) => h('button', { type: 'button', 'aria-pressed': String(access === v), onclick: () => { access = v; drawSeg(); explain(); } }, l)));
+      const why = h('p', { class: 'muted' });
+      const explain = () => why.textContent = { read: 'System info (CPU, memory, disks, Docker containers), list, read and search files. Nothing can be changed.', files: 'Everything in Look only, plus creating and changing files.', full: 'Everything, plus running any shell command as that user (restart containers, update, install…). The folder limit below then only applies to the file tools, since a command can go anywhere the user can.' }[access];
+      drawSeg(); explain();
+      const folders = h('textarea', { placeholder: 'One per line, e.g.\n~/docker\n/opt/stacks\n(empty = everywhere the user can go)' }, (srv.folders || []).join('\n'));
+      body.append(...field('Computer', comp), h('label', { class: 'f' }, 'What the AI may do'), seg, why, ...field('Only these folders', folders));
+      Object.assign(spec, { get computer() { return comp.value; }, get access() { return access; }, get folders() { return folders.value; } });
+    } else if (kind === 'command') {
+      const cmd = h('textarea', { placeholder: 'npx -y @modelcontextprotocol/server-filesystem /share', style: 'min-height:60px' }, srv.command || '');
+      const runOn = h('select', {}, h('option', { value: 'gateway', selected: srv.run_on === 'gateway' }, 'Inside the gateway'), ...compOpts(srv.run_on));
+      const env = h('textarea', { placeholder: 'GITHUB_PERSONAL_ACCESS_TOKEN=...\n(one NAME=value per line, optional)' }, Object.entries(srv.env || {}).map(([k, v]) => `${k}=${v}`).join('\n'));
+      body.append(...field('Command that starts the MCP server (stdio)', cmd),
+        h('p', { class: 'muted' }, 'Any MCP server that talks over stdin/stdout. Examples: npx -y @modelcontextprotocol/server-memory · npx -y @modelcontextprotocol/server-filesystem ~/projects · docker run -i --rm mcp/fetch · uvx mcp-server-git (on a computer that has uv).'),
+        ...field('Run it on', runOn),
+        h('p', { class: 'muted' }, 'Inside the gateway it runs as a limited user with Node.js (npx) available. On a computer it runs over SSH as that computer’s user, with its own PATH, so it can use anything installed there.'),
+        ...field('Environment variables', env));
+      Object.assign(spec, { get command() { return cmd.value; }, get run_on() { return runOn.value; }, get env() { return env.value; } });
+    } else if (kind === 'remote') {
+      const u = h('input', { value: srv.url || '', placeholder: 'https://example.com/mcp' });
+      const hd = h('textarea', { placeholder: 'Authorization: Bearer ...\n(one Name: value per line, optional)' }, Object.entries(srv.headers || {}).map(([k, v]) => `${k}: ${v}`).join('\n'));
+      body.append(...field('MCP server URL (Streamable HTTP)', u), ...field('Headers', hd),
+        h('p', { class: 'muted' }, 'For servers that use a fixed token or none. Servers that need an OAuth sign-in in the browser can’t be wrapped this way.'));
+      Object.assign(spec, { get url() { return u.value; }, get headers() { return hd.value; } });
+    }
+    const save = async () => { const j = { id: srv.id, name: name.value }; for (const k of Object.keys(spec)) j[k] = spec[k]; return api('mcp/servers', { method: 'POST', json: j }); };
+    const toolsBox = h('div');
+    const test = async () => {
+      toolsBox.replaceChildren(h('p', { class: 'muted' }, kind === 'command' ? 'Starting it (the first npx run can take a minute)…' : 'Connecting…'));
+      const r = await api(`mcp/servers/${srv.id}/check`, { method: 'POST' });
+      const hidden = new Set(srv.hidden_tools || []);
+      const rows = (r.tools || []).map(t => {
+        const cb = h('input', { type: 'checkbox', checked: !hidden.has(t.name) });
+        cb.onchange = () => cb.checked ? hidden.delete(t.name) : hidden.add(t.name);
+        return h('label', { class: 'keyrow', style: 'align-items:flex-start' }, cb, h('span', { class: 'grow' }, h('span', { class: 'mono' }, t.name), h('br'), h('span', { class: 'muted' }, t.description || '')));
+      });
+      toolsBox.replaceChildren(
+        h('div', { class: r.ok ? 'note' : 'note err' }, r.ok ? `Working ✓ ${r.reply || ''}${r.ms ? ` (${r.ms} ms)` : ''} · ${(r.tools || []).length} tools` : (r.error || 'Failed')),
+        r.log && r.log.length ? h('details', {}, h('summary', { class: 'muted' }, 'Server log'), h('pre', { class: 'term' }, r.log.join('\n'))) : null,
+        rows.length ? h('div', {}, h('h2', {}, 'Tools the AI gets (untick to hide)'), ...rows,
+          h('button', { class: 'b p', type: 'button', style: 'margin-top:8px', onclick: act(async () => { await api('mcp/servers', { method: 'POST', json: { id: srv.id, hidden_tools: [...hidden] } }); srv.hidden_tools = [...hidden]; toast('Saved'); }) }, 'Save tools')) : null);
+    };
+    body.append(h('div', { class: 'row', style: 'position:sticky;bottom:0;background:var(--panel);padding:8px 0' },
+      h('button', { class: 'b p', type: 'button', onclick: act(async () => { Object.assign(srv, await save()); toast('Saved'); await test(); }) }, 'Save & test'),
+      h('button', { class: 'b', type: 'button', onclick: act(test) }, 'Test'),
+      h('button', { class: 'b', type: 'button', onclick: () => { openPicker = ''; show(); } }, 'Close')), toolsBox);
+    return body;
   }
 
   // ------------------------------------------------------------ models (host your own AI)

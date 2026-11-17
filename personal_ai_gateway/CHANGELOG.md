@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.8.0
+
+- **MCP servers for anything, not just devices.** The Devices tab is now **MCP** and makes four kinds of server:
+  - **Computer (SSH):** reach another Pi, your laptop, a NAS or Home Assistant's SSH add-on. Look only (system info, Docker containers, list/read/search files), read & write files, or full control (run commands with a timeout). Optional folder limits that symlinks and `..` can't escape.
+  - **Command:** run any stdio MCP server (`npx`, `uvx`, `docker run -i`, your own script) inside the gateway as a limited user or on one of your computers over SSH.
+  - **Remote MCP URL:** wrap another MCP server (JSON or SSE replies, sessions renewed automatically) behind the gateway's address.
+- **Computers (SSH):** the gateway makes its own SSH key; add it with *Set up with password* (password not saved) or by hand. Test, edit, forget fingerprint.
+- Hide any tool of any server; **Save & test** shows its tools and error log.
+- Signed-in Claude / ChatGPT / Gemini accounts can now use **several** MCP servers at once.
+- Image: adds `openssh-client`, `sshpass` and `uv`/`uvx`.
+
 ## 1.7.0
 
 - **Sign in with an account, no API key.** Providers → *Sign in with an account*: install the official Claude Code, Codex (ChatGPT) or Gemini CLI tool with one button, sign in from the page (open the link, paste the code), and use `claude-account/sonnet`, `chatgpt-account/default`, `gemini-account/gemini-2.5-pro`... like any other model, in Home Assistant too.
