@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.0 - 2026-11-16
+
+- **Follows your Home Assistant theme.** The web UI now uses the colors of whatever theme Home Assistant is showing, light or dark, and changes live when you switch. Themes with a dashboard wallpaper and frosted-glass cards (like Apple / Liquid Glass themes) carry over too: wallpaper behind, see-through blurred cards, matching corners. Opened outside Home Assistant it keeps its own look.
+
 ## 1.8.0
 
 - **MCP servers for anything, not just devices.** The Devices tab is now **MCP** and makes four kinds of server:
