@@ -1147,7 +1147,7 @@ window.__hbAddon = "personal_ai_gateway";
       const seg = (cur, set) => {
         const box = h('span', { class: 'seg' });
         const draw = v => box.replaceChildren(...[['', 'Hidden'], ['read', 'Can see'], ['control', 'Can control']].map(([m, l]) =>
-          h('button', { type: 'button', 'aria-pressed': String((v || '') === m), onclick: e => { e.preventDefault(); e.stopPropagation(); set(m); draw(m); } }, l)));
+          h('button', { type: 'button', 'aria-pressed': (v || '') === m, onclick: e => { e.preventDefault(); e.stopPropagation(); set(m); draw(m); } }, l)));
         draw(cur); return box;
       };
       const paint = () => {
@@ -1197,13 +1197,13 @@ window.__hbAddon = "personal_ai_gateway";
       const comp = h('select', {}, h('option', { value: '' }, 'Pick a computer'), ...compOpts(srv.computer));
       let access = srv.access || 'read';
       const seg = h('span', { class: 'seg' });
-      const drawSeg = () => seg.replaceChildren(...ACCESS.map(([v, l]) => h('button', { type: 'button', 'aria-pressed': String(access === v), onclick: () => { access = v; drawSeg(); explain(); } }, l)));
+      const drawSeg = () => seg.replaceChildren(...ACCESS.map(([v, l]) => h('button', { type: 'button', 'aria-pressed': access === v, onclick: () => { access = v; drawSeg(); explain(); } }, l)));
       const why = h('p', { class: 'muted' });
       const explain = () => why.textContent = { read: 'System info (CPU, memory, disks, Docker containers), list, read and search files. Nothing can be changed.', files: 'Everything in Look only, plus creating and changing files.', full: 'Everything, plus running any shell command as that user (restart containers, update, install…). The folder limit below then only applies to the file tools, since a command can go anywhere the user can.' }[access];
       drawSeg(); explain();
       const folders = h('textarea', { placeholder: 'One per line, e.g.\n~/docker\n/opt/stacks\n(empty = everywhere the user can go)' }, (srv.folders || []).join('\n'));
       body.append(...field('Computer', comp), h('label', { class: 'f' }, 'What the AI may do'), seg, why, ...field('Only these folders', folders));
-      Object.assign(spec, { get computer() { return comp.value; }, get access() { return access; }, get folders() { return folders.value; } });
+      Object.defineProperties(spec, Object.getOwnPropertyDescriptors({ get computer() { return comp.value; }, get access() { return access; }, get folders() { return folders.value; } }));
     } else if (kind === 'command') {
       const cmd = h('textarea', { placeholder: 'npx -y @modelcontextprotocol/server-filesystem /share', style: 'min-height:60px' }, srv.command || '');
       const runOn = h('select', {}, h('option', { value: 'gateway', selected: srv.run_on === 'gateway' }, 'Inside the gateway'), ...compOpts(srv.run_on));
@@ -1213,13 +1213,13 @@ window.__hbAddon = "personal_ai_gateway";
         ...field('Run it on', runOn),
         h('p', { class: 'muted' }, 'Inside the gateway it runs as a limited user with Node.js (npx) available. On a computer it runs over SSH as that computer’s user, with its own PATH, so it can use anything installed there.'),
         ...field('Environment variables', env));
-      Object.assign(spec, { get command() { return cmd.value; }, get run_on() { return runOn.value; }, get env() { return env.value; } });
+      Object.defineProperties(spec, Object.getOwnPropertyDescriptors({ get command() { return cmd.value; }, get run_on() { return runOn.value; }, get env() { return env.value; } }));
     } else if (kind === 'remote') {
       const u = h('input', { value: srv.url || '', placeholder: 'https://example.com/mcp' });
       const hd = h('textarea', { placeholder: 'Authorization: Bearer ...\n(one Name: value per line, optional)' }, Object.entries(srv.headers || {}).map(([k, v]) => `${k}: ${v}`).join('\n'));
       body.append(...field('MCP server URL (Streamable HTTP)', u), ...field('Headers', hd),
         h('p', { class: 'muted' }, 'For servers that use a fixed token or none. Servers that need an OAuth sign-in in the browser can’t be wrapped this way.'));
-      Object.assign(spec, { get url() { return u.value; }, get headers() { return hd.value; } });
+      Object.defineProperties(spec, Object.getOwnPropertyDescriptors({ get url() { return u.value; }, get headers() { return hd.value; } }));
     }
     const save = async () => { const j = { id: srv.id, name: name.value }; for (const k of Object.keys(spec)) j[k] = spec[k]; return api('mcp/servers', { method: 'POST', json: j }); };
     const toolsBox = h('div');
