@@ -222,11 +222,26 @@ class Store:
         self.data["routes"] = clean
         self.save()
 
-    def mcp_ai_key(self) -> str:
-        """Key of the MCP server the signed-in AIs may use, or '' for none."""
+    def mcp_ai_servers(self) -> list[dict]:
+        """The enabled MCP servers the signed-in AIs may use: [{name, key, label}], names unique and tool-safe."""
         m = self.data.get("mcp") or {}
-        srv = (m.get("servers") or {}).get(m.get("ai_server") or "")
-        return srv["key"] if srv and srv.get("enabled", True) else ""
+        ids = m.get("ai_servers") if "ai_servers" in m else ([m["ai_server"]] if m.get("ai_server") else [])
+        out, used = [], set()
+        for sid in ids:
+            srv = (m.get("servers") or {}).get(sid)
+            if not srv or not srv.get("enabled", True):
+                continue
+            kind = srv.get("kind", "ha")
+            base = "home_assistant" if kind == "ha" and "home_assistant" not in used else \
+                (re.sub(r"[^a-z0-9]+", "_", srv["name"].lower()).strip("_") or kind)[:30]
+            name, n = base, 2
+            while name in used:
+                name, n = f"{base}_{n}", n + 1
+            used.add(name)
+            label = {"ha": "Home Assistant devices", "computer": "the computer", "command": "tools",
+                     "remote": "tools"}.get(kind, "tools")
+            out.append({"name": name, "key": srv["key"], "kind": kind, "label": f"{label} '{srv['name']}'"})
+        return out
 
     def regenerate_proxy_key(self) -> str:
         self.data["proxy_key"] = secrets.token_urlsafe(24)

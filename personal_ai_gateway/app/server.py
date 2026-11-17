@@ -19,12 +19,13 @@ from aiohttp import ClientSession, ClientTimeout, FormData, web
 
 from accounts import ACCOUNTS, Accounts
 from hub import Hub, OllamaError, run_bundled
+from machines import Machines, UpstreamError
 from mcp import HA, Devices, HAError
 from rotator import KeyPool, kid
 from store import DATA_DIR, PRESETS, Store
 from upstream import Gateway, err, sanitize
 
-VERSION = "1.7.0"
+VERSION = "1.8.0"
 TEST_MODELS = {"gemini": "gemini-2.5-flash", "openai": "gpt-4o-mini", "groq": "llama-3.3-70b-versatile",
                "mistral": "mistral-small-latest", "deepseek": "deepseek-chat", "cerebras": "llama3.1-8b"}
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -75,7 +76,7 @@ async def middleware(request, handler):
         return await handler(request)
     except web.HTTPException:
         raise
-    except (OllamaError, HAError, ValueError, KeyError) as e:
+    except (OllamaError, HAError, UpstreamError, ValueError, KeyError) as e:
         return web.json_response({"error": str(e) or type(e).__name__}, status=400)
     except Exception as e:  # noqa: BLE001
         log.exception("Unhandled error")
@@ -361,9 +362,12 @@ async def api_session_cancel(request):
 
 # -- devices (MCP servers)
 async def api_mcp(request):
-    servers = list(DEV.servers().values())
+    servers = [{**s, **({"status": DEV.machines.status(s)} if s.get("kind", "ha") != "ha" else {})}
+               for s in DEV.servers().values()]
     return web.json_response({
-        "servers": servers, "ai_server": DEV.cfg["ai_server"], "ha_connected": DEV.ha.configured(),
+        "servers": servers, "ai_server": DEV.cfg["ai_server"], "ai_servers": DEV.cfg["ai_servers"],
+        "computers": list(DEV.cfg["computers"].values()), "public_key": DEV.machines.computers.public_key(),
+        "ha_connected": DEV.ha.configured(),
         "ha_locked": DEV.ha.locked(), "ha_url": "" if DEV.ha.locked() else DEV.cfg.get("ha_url", ""),
         "ha_token_set": bool(DEV.cfg.get("ha_token")), "calls": DEV.calls[:15], "port": int(os.environ.get("PORT", "8000"))})
 
@@ -384,6 +388,46 @@ async def api_mcp_regen(request):
 
 async def api_mcp_settings(request):
     DEV.set_settings(await request.json())
+    return web.json_response({"ok": True})
+
+
+async def api_mcp_check(request):
+    srv = DEV.servers().get(request.match_info["sid"])
+    if not srv:
+        raise ValueError("That MCP server is gone.")
+    if srv.get("kind", "ha") == "ha":
+        from mcp import TOOLS
+        return web.json_response({"ok": DEV.ha.configured(), "tools": [{"name": t["name"], "description": t["description"]} for t in TOOLS]})
+    return web.json_response(await DEV.machines.check(srv))
+
+
+def _computer(request) -> dict:
+    c = DEV.cfg["computers"].get(request.match_info["cid"])
+    if not c:
+        raise ValueError("That computer is gone.")
+    return c
+
+
+async def api_computer_save(request):
+    return web.json_response(DEV.machines.computers.save(await request.json()))
+
+
+async def api_computer_delete(request):
+    DEV.machines.computers.delete(request.match_info["cid"], DEV.servers())
+    return web.json_response({"ok": True})
+
+
+async def api_computer_test(request):
+    return web.json_response(await DEV.machines.computers.test(_computer(request)))
+
+
+async def api_computer_key(request):
+    pw = str((await request.json()).get("password") or "")
+    return web.json_response(await DEV.machines.computers.install_key(_computer(request), pw))
+
+
+async def api_computer_forget(request):
+    DEV.machines.computers.forget_host(_computer(request))
     return web.json_response({"ok": True})
 
 
@@ -416,6 +460,7 @@ async def background(app):
     yield
     for t in tasks:
         t.cancel()
+    await DEV.machines.close()
     POOL.save()
     await app["session"].close()
 
@@ -429,6 +474,8 @@ async def make_app() -> web.Application:
     ACC = Accounts(STORE, int(os.environ.get("PORT", "8000")))
     GW.accounts = ACC
     DEV = Devices(STORE, HA(STORE, session), on_change=ACC.configure_mcp)
+    DEV.machines = Machines(STORE, session, ACC, DEV.calls)
+    DEV.cfg  # migrate older settings (single ai_server, servers without a kind)
     ACC.configure_mcp()
     app = web.Application(middlewares=[middleware], client_max_size=64 * 1024 * 1024)
     app["session"] = session
@@ -477,6 +524,12 @@ async def make_app() -> web.Application:
         web.post("/api/mcp/servers/{sid}/regenerate", api_mcp_regen),
         web.put("/api/mcp/settings", api_mcp_settings),
         web.get("/api/mcp/catalog", api_mcp_catalog),
+        web.post("/api/mcp/servers/{sid}/check", api_mcp_check),
+        web.post("/api/mcp/computers", api_computer_save),
+        web.delete("/api/mcp/computers/{cid}", api_computer_delete),
+        web.post("/api/mcp/computers/{cid}/test", api_computer_test),
+        web.post("/api/mcp/computers/{cid}/install-key", api_computer_key),
+        web.post("/api/mcp/computers/{cid}/forget-host", api_computer_forget),
         web.route("*", "/mcp", mcp_endpoint),
         web.route("*", "/mcp/{key}", mcp_endpoint),
     ])

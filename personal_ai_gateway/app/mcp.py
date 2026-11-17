@@ -1,5 +1,7 @@
 """MCP servers that give AI apps access to only the Home Assistant devices you pick.
 
+(Servers for computers, commands and other MCP servers live in machines.py; this file routes to them.)
+
 Each server has its own address (http://<host>:8000/mcp/<key>) and its own device list.
 Every device or entity is either "read" (can see it) or "control" (can see and use it).
 Any MCP client works: Claude, ChatGPT, Gemini CLI, Cursor, the signed-in AIs inside this
@@ -21,6 +23,7 @@ PROTOCOLS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 SERVER_INFO = {"name": "personal-ai-gateway-devices", "title": "Home Assistant devices", "version": "1.0.0"}
 FORBIDDEN_DATA = {"entity_id", "device_id", "area_id", "floor_id", "label_id"}
 MODES = ("read", "control")
+KINDS = ("ha", "computer", "command", "remote")
 
 
 class HAError(Exception):
@@ -58,7 +61,7 @@ class HA:
     async def rest(self, method: str, path: str, body=None, params=None):
         base, _, tok = self.conn()
         if not tok:
-            raise HAError("Home Assistant isn't connected. Set it up in Devices.")
+            raise HAError("Home Assistant isn't connected. Set it up on the gateway's MCP tab.")
         try:
             async with self.session.request(method, base + path, json=body, params=params,
                                             headers={"Authorization": f"Bearer {tok}"},
@@ -73,7 +76,7 @@ class HA:
     async def ws(self, *commands: dict) -> list:
         _, url, tok = self.conn()
         if not tok:
-            raise HAError("Home Assistant isn't connected. Set it up in Devices.")
+            raise HAError("Home Assistant isn't connected. Set it up on the gateway's MCP tab.")
         results = []
         try:
             async with self.session.ws_connect(url, timeout=ClientTimeout(total=30), max_msg_size=64 * 1024 * 1024) as w:
@@ -115,22 +118,32 @@ class HA:
 
 # ------------------------------------------------------------ servers (config lives in the Store)
 
-def new_server(name: str) -> dict:
-    return {"id": secrets.token_hex(4), "name": name.strip() or "Devices", "enabled": True,
-            "key": secrets.token_urlsafe(24), "devices": {}, "entities": {}, "created": int(time.time())}
+def new_server(name: str, kind: str = "ha") -> dict:
+    srv = {"id": secrets.token_hex(4), "kind": kind, "name": name.strip() or "Devices", "enabled": True,
+           "key": secrets.token_urlsafe(24), "created": int(time.time())}
+    if kind == "ha":
+        srv |= {"devices": {}, "entities": {}}
+    return srv
 
 
 class Devices:
     def __init__(self, store, ha: HA, on_change=None):
         self.store, self.ha, self.on_change = store, ha, on_change
         self.calls: list[dict] = []
+        self.machines = None  # set by server.py (needs the accounts helper)
 
     # -- config
     @property
     def cfg(self) -> dict:
         m = self.store.data.setdefault("mcp", {})
         m.setdefault("servers", {})
-        m.setdefault("ai_server", "")
+        m.setdefault("computers", {})
+        if "ai_servers" not in m:
+            m["ai_servers"] = [m["ai_server"]] if m.get("ai_server") else []
+        m["ai_servers"] = [x for x in m["ai_servers"] if x in m["servers"]]
+        m["ai_server"] = m["ai_servers"][0] if m["ai_servers"] else ""
+        for srv in m["servers"].values():
+            srv.setdefault("kind", "ha")
         return m
 
     def servers(self) -> dict:
@@ -145,22 +158,35 @@ class Devices:
 
     def save_server(self, spec: dict) -> dict:
         sid = str(spec.get("id") or "")
-        srv = self.servers().get(sid) or new_server(str(spec.get("name") or "Devices"))
+        srv = self.servers().get(sid)
+        if not srv:
+            if sid:
+                raise ValueError("That MCP server is gone.")
+            kind = str(spec.get("kind") or "ha")
+            if kind not in KINDS:
+                raise ValueError("Unknown kind of MCP server.")
+            srv = new_server(str(spec.get("name") or {"ha": "Devices", "computer": "Computer", "command": "Command",
+                                                       "remote": "Remote"}[kind]), kind)
         if "name" in spec:
             srv["name"] = str(spec["name"]).strip()[:60] or srv["name"]
         if "enabled" in spec:
             srv["enabled"] = bool(spec["enabled"])
-        for k in ("devices", "entities"):
-            if k in spec and isinstance(spec[k], dict):
-                srv[k] = {str(i): m for i, m in spec[k].items() if m in MODES}
+        if srv["kind"] == "ha":
+            for k in ("devices", "entities"):
+                if k in spec and isinstance(spec[k], dict):
+                    srv[k] = {str(i): m for i, m in spec[k].items() if m in MODES}
+            if "hidden_tools" in spec and isinstance(spec["hidden_tools"], list):
+                srv["hidden_tools"] = [str(x) for x in spec["hidden_tools"]]
+        else:
+            self.machines.apply(srv, spec)
         self.servers()[srv["id"]] = srv
         self._saved()
         return srv
 
     def delete(self, sid: str) -> None:
         self.servers().pop(sid, None)
-        if self.cfg["ai_server"] == sid:
-            self.cfg["ai_server"] = ""
+        if self.machines:
+            self.machines.reset(sid)
         self._saved()
 
     def regenerate(self, sid: str) -> dict:
@@ -170,11 +196,14 @@ class Devices:
         return srv
 
     def set_settings(self, b: dict) -> None:
-        if "ai_server" in b:
-            sid = str(b["ai_server"] or "")
-            if sid and sid not in self.servers():
+        if "ai_server" in b:  # older single choice (still used by the Home Assistant integration)
+            b = {**b, "ai_servers": [b["ai_server"]] if b["ai_server"] else []}
+        if "ai_servers" in b:
+            ids = [str(x) for x in b["ai_servers"] or [] if str(x)]
+            if any(x not in self.servers() for x in ids):
                 raise ValueError("Unknown MCP server.")
-            self.cfg["ai_server"] = sid
+            self.cfg["ai_servers"] = list(dict.fromkeys(ids))
+            self.cfg["ai_server"] = ids[0] if ids else ""
         for k in ("ha_url", "ha_token"):
             if k in b and not self.ha.locked():
                 self.cfg[k] = str(b[k]).strip()
@@ -236,7 +265,7 @@ class Devices:
             key = auth[7:].strip()
         srv = self.by_key(key)
         if not srv:
-            return web.json_response({"error": "Unknown or disabled MCP address. Copy it again from the gateway's Devices tab."},
+            return web.json_response({"error": "Unknown or disabled MCP address. Copy it again from the gateway's MCP tab."},
                                      status=401, headers=cors)
         if request.method == "GET":
             return web.Response(status=405, headers={**cors, "Allow": "POST"}, text="This server only answers POST requests.")
@@ -247,16 +276,21 @@ class Devices:
         except ValueError:
             return web.json_response(rpc_error(None, -32700, "Parse error"), status=400, headers=cors)
         if isinstance(msg, list):
-            replies = [r for r in [await self.dispatch(srv, m) for m in msg] if r is not None]
+            replies = [r for r in [await self.route(srv, m) for m in msg] if r is not None]
             return web.json_response(replies, headers=cors) if replies else web.Response(status=202, headers=cors)
-        reply = await self.dispatch(srv, msg)
+        reply = await self.route(srv, msg)
         if reply is None:
             return web.Response(status=202, headers=cors)
         return web.json_response(reply, headers=cors)
 
-    async def dispatch(self, srv: dict, m: dict):
+    async def route(self, srv: dict, m: dict):
         if not isinstance(m, dict) or m.get("jsonrpc") != "2.0":
             return rpc_error(None, -32600, "Invalid request")
+        if srv.get("kind", "ha") != "ha":
+            return await self.machines.dispatch(srv, m, PROTOCOLS, SERVER_INFO)
+        return await self.dispatch(srv, m)
+
+    async def dispatch(self, srv: dict, m: dict):
         mid, method, params = m.get("id"), m.get("method"), m.get("params") or {}
         if mid is None:  # notification (initialized, cancelled ...) or a response to us
             return None
@@ -273,7 +307,8 @@ class Devices:
             if method == "ping":
                 return rpc_ok(mid, {})
             if method == "tools/list":
-                return rpc_ok(mid, {"tools": TOOLS})
+                hidden = set(srv.get("hidden_tools") or [])
+                return rpc_ok(mid, {"tools": [t for t in TOOLS if t["name"] not in hidden]})
             if method in ("resources/list", "prompts/list"):
                 return rpc_ok(mid, {method.split("/")[0]: []})
             if method == "resources/templates/list":
@@ -285,6 +320,8 @@ class Devices:
             return rpc_ok(mid, tool_text(str(e), error=True)) if method == "tools/call" else rpc_error(mid, -32000, str(e))
 
     async def call_tool(self, srv: dict, name: str, args: dict) -> dict:
+        if name in (srv.get("hidden_tools") or []):
+            return tool_text(f"{name} is turned off for this MCP server.", error=True)
         allowed = await self.allowed(srv)
         reg = self.ha._reg[1]
         try:

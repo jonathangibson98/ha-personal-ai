@@ -347,9 +347,13 @@ class Accounts:
         self.store.save()
 
     # -- device access (MCP) for the signed-in tools
-    def mcp_url(self) -> str:
-        key = self.store.mcp_ai_key()
-        return f"http://127.0.0.1:{self.port}/mcp/{key}" if key else ""
+    def mcp_servers(self) -> dict[str, dict]:
+        """name -> {url, label} for every MCP server picked under MCP > Signed-in AIs."""
+        return {s["name"]: {"url": f"http://127.0.0.1:{self.port}/mcp/{s['key']}", "label": s["label"]}
+                for s in self.store.mcp_ai_servers()}
+
+    def _ours(self, url: str) -> bool:
+        return str(url or "").startswith(f"http://127.0.0.1:{self.port}/mcp/")
 
     def _write_owned(self, path: Path, text: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -373,21 +377,20 @@ class Accounts:
         s["selectedAuthType"] = "oauth-personal"
         s.setdefault("ui", {})["hideBanner"] = True
         servers = s.setdefault("mcpServers", {})
-        url = self.mcp_url()
-        if url:
-            servers[MCP_NAME] = {"type": "http", "url": url, "trust": True}
-        else:
-            servers.pop(MCP_NAME, None)
+        for name in [n for n, v in servers.items() if n == MCP_NAME or self._ours((v or {}).get("url"))]:
+            servers.pop(name)
+        for name, v in self.mcp_servers().items():
+            servers[name] = {"type": "http", "url": v["url"], "trust": True}
         self._write_owned(p, json.dumps(s, indent=2))
 
     def _codex_config(self) -> None:
         p = HOME / ".codex" / "config.toml"
         text = p.read_text() if p.is_file() else ""
         text = re.sub(r"(?ms)^# >>> personal-ai-gateway.*?^# <<< personal-ai-gateway\n?", "", text).rstrip()
-        url = self.mcp_url()
-        if url:
-            text += (f"\n\n# >>> personal-ai-gateway (managed, don't edit)\n[mcp_servers.{MCP_NAME}]\n"
-                     f"url = \"{url}\"\n# <<< personal-ai-gateway\n")
+        servers = self.mcp_servers()
+        if servers:
+            text += "\n\n# >>> personal-ai-gateway (managed, don't edit)\n" + "".join(
+                f"[mcp_servers.{n}]\nurl = \"{v['url']}\"\n" for n, v in servers.items()) + "# <<< personal-ai-gateway\n"
         self._write_owned(p, text.lstrip())
 
     def configure_mcp(self) -> None:
@@ -396,7 +399,7 @@ class Accounts:
             self._gemini_settings()
             self._codex_config()
             self._write_owned(CLI_DIR / "claude-mcp.json", json.dumps(
-                {"mcpServers": {MCP_NAME: {"type": "http", "url": self.mcp_url()}}} if self.mcp_url() else {"mcpServers": {}}))
+                {"mcpServers": {n: {"type": "http", "url": v["url"]} for n, v in self.mcp_servers().items()}}))
         except OSError as e:
             log.warning("Couldn't write the AI tools' device settings: %s", e)
 
@@ -410,10 +413,11 @@ class Accounts:
             raise CliError(f"{ACCOUNTS[acct]['label']} isn't installed yet (Providers > Sign in with an account).")
         system, prompt = transcript(body.get("messages") or [])
         system = system or DEFAULT_SYSTEM
-        use_mcp = bool(self.mcp_url())
+        use_mcp = list(self.mcp_servers().items())
         if use_mcp:
-            system += ("\n\nYou can see and control the user's chosen Home Assistant devices with the "
-                       f"{MCP_NAME} tools. Use them when the user asks about or wants to change a device.")
+            system += "\n\nYou have these tool sets (MCP servers) the user chose for you: " + "; ".join(
+                f"{n} = {v['label']}" for n, v in use_mcp) + ". Use them when the user's request needs them."
+            use_mcp = [n for n, _ in use_mcp]
         async with self.sem:
             if acct == "claude":
                 return await self._claude(b, model, system, prompt, use_mcp, timeout)
@@ -429,7 +433,8 @@ class Accounts:
         argv = [b, "-p", "--output-format", "json", "--no-session-persistence", "--system-prompt-file", f.name,
                 "--tools", "", "--strict-mcp-config"]
         if use_mcp:
-            argv += ["--mcp-config", str(CLI_DIR / "claude-mcp.json"), "--allowedTools", f"mcp__{MCP_NAME}"]
+            argv += ["--mcp-config", str(CLI_DIR / "claude-mcp.json"),
+                     "--allowedTools", ",".join(f"mcp__{n}" for n in use_mcp)]
         if model and model != "default":
             argv += ["--model", model]
         try:
@@ -465,8 +470,8 @@ class Accounts:
         argv = [b, "-o", "json", "--approval-mode", "default", "-p", "Follow the instructions and reply."]
         if model and model != "default":
             argv += ["-m", model]
-        if use_mcp:
-            argv += ["--allowed-mcp-server-names", MCP_NAME]
+        for n in use_mcp or []:
+            argv += ["--allowed-mcp-server-names", n]
         code, out, err = await self.run(argv, f"{system}\n\n{prompt}", timeout)
         start = out.find("{")
         try:

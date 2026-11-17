@@ -1,6 +1,6 @@
 # Personal AI Gateway
 
-One OpenAI-compatible address for every AI you use: your cloud keys, **your Claude / ChatGPT / Gemini accounts (no API key)**, and models you download and run yourself. Plus **MCP servers** that let AI apps see and control only the Home Assistant devices you pick.
+One OpenAI-compatible address for every AI you use: your cloud keys, **your Claude / ChatGPT / Gemini accounts (no API key)**, and models you download and run yourself. Plus **MCP servers** that let AI apps use only what you allow: the Home Assistant devices you pick, **your other computers over SSH** (a second Pi, your laptop...), and any MCP tool you run.
 
 ```
 apps (Personal AI in Home Assistant, SillyTavern, Open WebUI...) → Gateway → Gemini / OpenAI / Groq / OpenRouter ... / your Ollama
@@ -33,14 +33,23 @@ Providers → **Sign in with an account**. Each one uses that company's own offi
 Good to know:
 
 - Answers count against your plan's normal usage limits, the same as using the app. Use it for yourself, under each company's terms.
-- These models answer with text. Home Assistant's own "control devices" tools aren't passed through; instead pick an MCP server under **Devices → Signed-in AIs** and the account can see and control exactly those devices.
+- These models answer with text. Home Assistant's own "control devices" tools aren't passed through; instead tick MCP servers under **MCP → Signed-in AIs** and the account can use exactly those (devices, computers, tools).
 - Each request starts the tool once, so expect a few seconds more than an API key. At most 2 run at once (`CLI_CONCURRENCY` to change).
 - **Update** gets the newest version of the tool. **Sign out** forgets the sign-in.
 - The tools run as a separate user that can't read the gateway's keys or settings.
 
-## Devices: MCP servers for the devices you choose
+## MCP servers
 
-MCP is the standard way AI apps connect to tools. The **Devices** tab makes MCP servers that only expose the Home Assistant devices you pick:
+MCP is the standard way AI apps connect to tools. The **MCP** tab makes MCP servers, each with its own private address. There are four kinds:
+
+| Kind | What the AI gets |
+|---|---|
+| **Home Assistant devices** | only the devices/entities you pick, each read-only or controllable |
+| **Computer (SSH)** | another machine: system info, files, and (if you allow) shell commands |
+| **Command (stdio MCP)** | any MCP server that runs as a command, inside the gateway or on one of your computers |
+| **Remote MCP URL** | another MCP server's address, wrapped behind this gateway's key |
+
+### Home Assistant devices
 
 1. Type a name (e.g. *Living room*) and press **Create**.
 2. For every device (or single entity) choose **Hidden**, **Can see** or **Can control**. A device's choice covers all its entities; set an entity on its own to override it. Press **Save devices**.
@@ -48,12 +57,40 @@ MCP is the standard way AI apps connect to tools. The **Devices** tab makes MCP 
 
 Make as many as you like, e.g. *Everything* for yourself and *Lights only* for something else. **Turn off** stops one without deleting it.
 
-Tools the AI gets: `list_devices`, `get_state`, `get_history` (up to 7 days), `list_actions`, and `call_action` (only for *Can control*, and only on that one entity; it can't aim an action at other devices or areas). The last device actions are listed at the bottom of the tab.
+Tools the AI gets: `list_devices`, `get_state`, `get_history` (up to 7 days), `list_actions`, and `call_action` (only for *Can control*, and only on that one entity; it can't aim an action at other devices or areas). The last actions (device actions, commands, file writes, tool calls) are listed at the bottom of the tab.
 
-- **Signed-in AIs:** pick a server here and the Claude, ChatGPT and Gemini accounts use it automatically, including when you talk to them through Home Assistant.
+### Computers (SSH): reach your other Pi, your laptop...
+
+1. **MCP → Computers (SSH) → Add a computer:** a name, its address (LAN IP like `192.168.1.20`, or a Tailscale name so it works away from home), user name and SSH port. SSH must be on there (Raspberry Pi OS: `sudo raspi-config` → Interface → SSH; Ubuntu/Debian laptop: `sudo apt install openssh-server`).
+2. Press **Set up with password**, type that user's password once. The gateway adds its own key to the computer's `~/.ssh/authorized_keys`; the password isn't saved. (Or copy the command under *The gateway's SSH key* and run it on the computer.) **Test** should say *Connected ✓*.
+3. **New MCP server → Computer (SSH)**, then **Settings & tools**: pick the computer and what the AI may do:
+   - **Look only:** `system_info` (CPU, temperature, memory, disks, busiest processes, Docker containers), `list_files`, `read_file`, `find_files`.
+   - **Read & write files:** plus `write_file`.
+   - **Full control:** plus `run_command` (any shell command as that user, with a timeout, e.g. restart a container, check logs, update).
+   - **Only these folders** (optional, one per line, e.g. `~/docker`) limits the file tools; symlinks and `..` can't escape it. With *Full control* a command can still go anywhere the user can, so use a user with limited rights if that matters.
+4. Untick any tool you don't want under *Tools the AI gets*, **Save tools**, then copy the address like any other server.
+
+Home Assistant OS itself: install the *Advanced SSH & Web Terminal* add-on, paste the gateway's key into its `authorized_keys` option, and add a computer with its user and port. If a computer is reinstalled, press **Forget fingerprint** once.
+
+### Command: any MCP server you can run
+
+Paste the command that starts it, for example `npx -y @modelcontextprotocol/server-memory`, `uvx mcp-server-git`, or `python3 ~/my_mcp.py`, and choose where it runs:
+
+- **Inside the gateway:** runs as a limited user that can't read the gateway's keys; Node.js (`npx`) and `uv`/`uvx` are included. It starts on first use and keeps running; it's restarted if it stops or you change it.
+- **On a computer:** runs over SSH with that user's normal PATH, so it can use anything installed there (Docker, files on that machine...).
+
+Add environment variables (tokens) one `NAME=value` per line. **Save & test** starts it and lists its tools; untick the ones to hide. The *Server log* shows its error output if it won't start.
+
+### Remote MCP URL
+
+An MCP server reachable over HTTP (Streamable HTTP), with optional headers such as `Authorization: Bearer ...`. Useful to give all your MCP tools one place and one kind of key. Servers that need a browser sign-in (OAuth) can't be wrapped.
+
+### Using the addresses
+
+- **Signed-in AIs:** tick servers here (as many as you like) and the Claude, ChatGPT and Gemini accounts use them automatically, including when you talk to them through Home Assistant.
 - **From another app on your network:** use the address as shown (`http://<home-assistant-ip>:8000/mcp/<key>`). The key can also be sent as `Authorization: Bearer <key>` to `http://<host>:8000/mcp`.
 - **From the internet** (for example claude.ai or ChatGPT custom connectors, which need https): forward it through your reverse proxy (Nginx Proxy Manager, Cloudflare Tunnel...) to port 8000 and use `https://<your-domain>/mcp/<key>`.
-- **Plain Docker install:** the add-on connects to Home Assistant by itself. In Docker, set `HA_URL` and `HA_TOKEN` (a long-lived access token from your HA profile → Security), or enter them on the Devices tab.
+- **Plain Docker install:** the add-on connects to Home Assistant by itself. In Docker, set `HA_URL` and `HA_TOKEN` (a long-lived access token from your HA profile → Security), or enter them on the MCP tab (only needed for device servers).
 
 ## Connect Personal AI (Home Assistant)
 
@@ -92,13 +129,15 @@ Things to know about the built-in Ollama:
 
 ## Settings by environment / add-on options
 
-`PROXY_API_KEY`, `ADMIN_PASSWORD`, `OLLAMA_URL`, `OLLAMA_PRELOAD`, `HA_URL`, `HA_TOKEN` (Docker only, for Devices), `CLI_CONCURRENCY`, and `<PROVIDER>_API_KEY_<N>` (e.g. `GEMINI_API_KEY_2`). Known provider names are created automatically; add any other OpenAI-compatible service from the Providers tab.
+`PROXY_API_KEY`, `ADMIN_PASSWORD`, `OLLAMA_URL`, `OLLAMA_PRELOAD`, `HA_URL`, `HA_TOKEN` (Docker only, for device MCP servers), `CLI_CONCURRENCY`, and `<PROVIDER>_API_KEY_<N>` (e.g. `GEMINI_API_KEY_2`). Known provider names are created automatically; add any other OpenAI-compatible service from the Providers tab.
 
 ## Troubleshooting
 
 - **Account sign-in window shows an error:** read the text in the window; press **Sign in again** to start over. "Not logged in" or "authentication" errors in chat mean the sign-in expired: sign in again.
 - **An account model answers slowly:** normal for the first request after a restart (the tool loads). Big Home Assistant prompts (many exposed entities) also take longer.
-- **Devices tab says Home Assistant isn't connected:** update the add-on (1.7.0 adds Home Assistant API access) and restart it. In Docker, check `HA_URL` and `HA_TOKEN`.
+- **A computer says it refused the key:** press **Set up with password** again, or check the user name. *Fingerprint changed:* **Forget fingerprint**.
+- **A Command server won't start:** open **Settings & tools → Test** and read the *Server log*; usually a typo or a missing program on that machine.
+- **MCP tab says Home Assistant isn't connected:** update the add-on (1.7.0 adds Home Assistant API access) and restart it. In Docker, check `HA_URL` and `HA_TOKEN`.
 - **An MCP app says 401:** the address is wrong, was replaced with **New address**, or the server is turned off.
 
 - **Downloads fail / "Can't reach Ollama":** with the built-in Ollama the address must be `http://127.0.0.1:11434` (Settings → *Use the built-in Ollama*). For an Ollama elsewhere it must be that machine's LAN address. Use Settings → Test connection, and check the add-on log.

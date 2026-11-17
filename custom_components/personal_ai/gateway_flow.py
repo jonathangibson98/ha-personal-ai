@@ -366,8 +366,10 @@ class GatewayOptionsFlow(OptionsFlow):
         except GatewayError as err:
             return self._fail(err)
         opts = ["new_server"]
+        if any(s.get("kind", "ha") == "ha" for s in m["servers"]):
+            opts.append("edit_server")
         if m["servers"]:
-            opts += ["edit_server", "ai_server"]
+            opts.append("ai_server")
         if not m["ha_locked"]:
             opts.append("ha_link")
         if not m["ha_connected"]:
@@ -423,7 +425,13 @@ class GatewayOptionsFlow(OptionsFlow):
             return await self.async_step_server_devices()
         return self.async_show_form(
             step_id="edit_server",
-            data_schema=vol.Schema({vol.Required("server"): _select([(s["id"], s["name"]) for s in m["servers"]])}),
+            data_schema=vol.Schema(
+                {
+                    vol.Required("server"): _select(
+                        [(s["id"], s["name"]) for s in m["servers"] if s.get("kind", "ha") == "ha"]
+                    )
+                }
+            ),
         )
 
     async def async_step_server_devices(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
