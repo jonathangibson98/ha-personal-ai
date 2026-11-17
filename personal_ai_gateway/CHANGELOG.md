@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.1 - 2026-11-16
+
+- **Fixed: changes to a computer, command or remote MCP server weren't saved.** Picking *Read & write files* or *Full control*, folder limits, the computer, the command, its environment, the URL or headers all reverted to what they were when you opened the settings. Only the name stuck. Now every field saves.
+- Fixed (2.0.0): all access buttons showed as selected at once; only the chosen one is highlighted again (same for device modes).
+
 ## 2.0.0 - 2026-11-16
 
 - **HTTPS address for MCP servers.** Claude, ChatGPT and other apps only connect to MCP servers over https. New card at the top of the MCP tab: an **instant Cloudflare tunnel** (no account, one tap), **your own Cloudflare tunnel** (fixed address on your domain, paste a token), or **your own HTTPS** (Nginx Proxy Manager, DuckDNS, Tailscale Funnel…). Server cards then show the https address to copy. Only `/mcp/<key>` goes through it (a separate MCP-only listener); the page and the `/v1` API stay on your network.
