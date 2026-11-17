@@ -18,6 +18,7 @@ from pathlib import Path
 from aiohttp import ClientSession, ClientTimeout, FormData, web
 
 from accounts import ACCOUNTS, Accounts
+from auth import COOKIE, Auth
 import socket
 
 from hub import Hub, OllamaError
@@ -28,7 +29,7 @@ from store import DATA_DIR, PRESETS, Store
 from tunnel import Tunnel
 from upstream import Gateway, err, sanitize
 
-VERSION = "2.0.2"
+VERSION = "2.1.0"
 TEST_MODELS = {"gemini": "gemini-2.5-flash", "openai": "gpt-4o-mini", "groq": "llama-3.3-70b-versatile",
                "mistral": "mistral-small-latest", "deepseek": "deepseek-chat", "cerebras": "llama3.1-8b"}
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -43,6 +44,7 @@ HUB: Hub
 ACC: Accounts
 DEV: Devices
 TUN: Tunnel
+AUTH: Auth
 START = time.time()
 
 
@@ -73,9 +75,10 @@ async def middleware(request, handler):
         resp.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, x-api-key"
         resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         return resp
-    if path.startswith("/api/") and request.remote != INGRESS_IP:
-        if not secret_ok(request.headers.get("X-Admin-Token", ""), STORE.admin_password):
-            return web.json_response({"error": "Unauthorized"}, status=401)
+    if path.startswith("/api/") and path not in ("/api/login", "/api/auth") and request.remote != INGRESS_IP:
+        if not (secret_ok(request.headers.get("X-Admin-Token", ""), STORE.admin_password)
+                or AUTH.check(request.cookies.get(COOKIE, ""))):
+            return web.json_response({"error": "Signed out"}, status=401)
     try:
         return await handler(request)
     except web.HTTPException:
@@ -161,7 +164,7 @@ async def api_state(request):
         "providers": providers, "routes": STORE.data["routes"], "settings": STORE.settings(),
         "presets": {k: v for k, v in PRESETS.items()}, "recent": list(GW.recent)[:30],
         "ollama": await HUB.status(), "addon": bool(INGRESS_IP), "bundled": False, "disk_free": None,
-        "public": TUN.info(), "open_webui": await open_webui_info(request.app["session"]),
+        "public": TUN.info(), "sessions": AUTH.count(), "open_webui": await open_webui_info(request.app["session"]),
         "env_locked": [k for k, e in (("ollama_url", "OLLAMA_URL"), ("ollama_preload", "OLLAMA_PRELOAD"))
                        if os.environ.get(e, "").strip()],
     })
@@ -257,7 +260,60 @@ async def api_settings(request):
 
 
 async def api_regen(request):
-    return web.json_response({"proxy_key": STORE.regenerate_proxy_key()})
+    old = AUTH.check(request.cookies.get(COOKIE, ""))
+    resp = web.json_response({"proxy_key": STORE.regenerate_proxy_key()})
+    if old:  # if the proxy key is also the password, keep this browser signed in
+        set_session(request, resp, bool(old.get("remember")))
+    return resp
+
+
+# -- sign-in (cookie sessions, see auth.py)
+def is_https(request) -> bool:
+    return request.secure or request.headers.get("X-Forwarded-Proto", "").lower() == "https"
+
+
+def set_session(request, resp, remember: bool) -> None:
+    token, life = AUTH.create(remember, request.headers.get("User-Agent", ""))
+    resp.set_cookie(COOKIE, token, max_age=life if remember else None, httponly=True, samesite="Lax",
+                    secure=is_https(request), path="/")
+
+
+async def api_auth(request):
+    ingress = request.remote == INGRESS_IP and bool(INGRESS_IP)
+    signed = ingress or bool(AUTH.check(request.cookies.get(COOKIE, ""))) or \
+        secret_ok(request.headers.get("X-Admin-Token", ""), STORE.admin_password)
+    return web.json_response({"signed_in": signed, "ingress": ingress, "separate_password": bool(STORE._opt("admin_password", "ADMIN_PASSWORD"))})
+
+
+async def api_login(request):
+    who = request.remote or "?"
+    if AUTH.too_many(who):
+        return web.json_response({"error": "Too many wrong passwords. Wait 5 minutes and try again."}, status=429)
+    try:
+        b = await request.json()
+    except ValueError:
+        b = {}
+    if not secret_ok(str(b.get("password") or ""), STORE.admin_password):
+        AUTH.failed(who)
+        await asyncio.sleep(0.6)
+        return web.json_response({"error": "Wrong password"}, status=401)
+    resp = web.json_response({"ok": True})
+    set_session(request, resp, b.get("remember", True) is not False)
+    return resp
+
+
+async def api_logout(request):
+    AUTH.drop(request.cookies.get(COOKIE, ""))
+    resp = web.json_response({"ok": True})
+    resp.del_cookie(COOKIE, path="/")
+    return resp
+
+
+async def api_logout_all(request):
+    n = AUTH.drop_all()
+    resp = web.json_response({"ok": True, "signed_out": n})
+    resp.del_cookie(COOKIE, path="/")
+    return resp
 
 
 async def api_all_models(request):
@@ -507,6 +563,18 @@ async def open_webui_info(session) -> dict:
     return out
 
 
+async def manifest(request):
+    return web.json_response({
+        "name": "Personal AI Gateway", "short_name": "AI Gateway", "start_url": ".", "scope": ".",
+        "display": "standalone", "background_color": "#0e1015", "theme_color": "#0e1015",
+        "icons": [{"src": "icon.png", "sizes": "256x256", "type": "image/png", "purpose": "any"}]},
+        content_type="application/manifest+json")
+
+
+async def icon(request):
+    return web.FileResponse(APP_DIR / "ui" / "icon.png", headers={"Cache-Control": "max-age=86400"})
+
+
 async def index(request):
     return web.FileResponse(APP_DIR / "ui" / "index.html", headers={"Cache-Control": "no-store"})
 
@@ -554,8 +622,9 @@ async def make_app() -> web.Application:
     POOL = KeyPool(DATA_DIR / "usage.json", STORE.setting("cooldowns"))
     session = ClientSession(timeout=ClientTimeout(total=None))
     GW, HUB = Gateway(STORE, POOL, session), Hub(STORE, session)
-    global TUN
+    global TUN, AUTH
     TUN = Tunnel(STORE)
+    AUTH = Auth(DATA_DIR, lambda: STORE.admin_password)
     ACC = Accounts(STORE, int(os.environ.get("PORT", "8000")))
     GW.accounts = ACC
     DEV = Devices(STORE, HA(STORE, session), on_change=ACC.configure_mcp)
@@ -615,6 +684,9 @@ async def make_app() -> web.Application:
         web.post("/api/mcp/computers/{cid}/test", api_computer_test),
         web.post("/api/mcp/computers/{cid}/install-key", api_computer_key),
         web.post("/api/mcp/computers/{cid}/forget-host", api_computer_forget),
+        web.get("/api/auth", api_auth), web.post("/api/login", api_login),
+        web.post("/api/logout", api_logout), web.post("/api/logout-all", api_logout_all),
+        web.get("/manifest.webmanifest", manifest), web.get("/icon.png", icon),
         web.put("/api/public", api_public), web.get("/api/public", api_public_status),
         web.route("*", "/mcp", mcp_endpoint),
         web.route("*", "/mcp/{key}", mcp_endpoint),

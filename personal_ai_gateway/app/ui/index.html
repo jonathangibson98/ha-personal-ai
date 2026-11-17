@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Personal AI Gateway</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="AI Gateway">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0e1015">
 <style>
 /* Personal AI Gateway — own look when opened directly; inside Home Assistant the theme script
    (further down) maps these colors to your HA theme (wallpaper and glass cards included). */
@@ -44,6 +52,7 @@ nav button{background:none;border:0;border-radius:16px;padding:7px 2px 6px;font:
   display:flex;flex-direction:column;align-items:center;gap:3px;transition:background .15s,color .15s}
 nav svg{width:21px;height:21px;fill:currentColor}
 nav button:hover{color:var(--ink)}
+nav button span.short{display:none}
 nav button[aria-current=page]{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
 header{order:0}main{order:2}
 @media (min-width:820px){
@@ -133,6 +142,58 @@ details.dev summary::-webkit-details-marker{display:none}
 #toast.err{background:var(--danger);color:#fff}
 @media (prefers-reduced-motion:no-preference){.lamp.cooling{animation:pulse 2s ease-in-out infinite}@keyframes pulse{50%{opacity:.55}}
   main>div>*{animation:rise .25s ease both}@keyframes rise{from{opacity:0;transform:translateY(4px)}}}
+
+/* ---------- sign-in ---------- */
+#login{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:20px calc(20px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+  background:radial-gradient(900px 500px at 50% -10%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 70%),var(--bg);overflow-y:auto}
+#login[hidden]{display:none}
+body.signed-out header,body.signed-out nav,body.signed-out main{visibility:hidden}
+.login-card{width:100%;max-width:390px;background:var(--panel);border:1px solid var(--line);border-radius:26px;padding:28px 22px 22px;box-shadow:var(--shadow);text-align:center}
+.login-card h1{font-size:1.35rem;margin:14px 0 4px}
+.login-card label.f{text-align:left;margin-top:18px}
+.logo.big{width:62px;height:62px;border-radius:19px;margin:0 auto}
+.logo.big svg{width:34px;height:34px}
+.pwrow{display:flex;gap:8px}
+.pwrow input{flex:1;min-width:0}
+.switch{display:flex;align-items:center;gap:12px;text-align:left;margin:16px 2px 4px;cursor:pointer;flex-wrap:wrap}
+.switch input{position:absolute;opacity:0;pointer-events:none}
+.switch span{width:46px;height:28px;border-radius:99px;background:var(--line);position:relative;flex:none;transition:background .2s}
+.switch span::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
+.switch input:checked+span{background:var(--ready)}
+.switch input:checked+span::after{transform:translateX(18px)}
+.switch input:focus-visible+span{outline:3px solid color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:2px}
+.switch b{font-size:.92rem}
+.switch small{color:var(--muted);font-size:.78rem;flex-basis:100%;margin:-8px 0 0 58px}
+#loginerr{min-height:1.3em;margin:10px 0 6px;font-size:.88rem;font-weight:600}
+.b.wide{width:100%;justify-content:center;padding:12px;font-size:1rem}
+/* ---------- phones ---------- */
+body{height:100dvh}
+@media (max-width:640px){
+  header{padding:10px 14px 4px}
+  .logo{width:34px;height:34px;border-radius:11px}
+  h1{font-size:1.05rem}
+  main{padding:4px 12px 16px}
+  .card{padding:14px;border-radius:16px;margin:10px 0}
+  button.b,a.b{min-height:42px;padding:9px 14px;justify-content:center}
+  .card .row>.b,.card .row>a.b{flex:1 1 auto}
+  .row{gap:8px}
+  .seg button{padding:8px 10px;font-size:.8rem}
+  .choices,.tiles{grid-template-columns:1fr 1fr}
+  .tile{padding:12px}
+  .keyrow{gap:8px}
+  .mono{font-size:.78rem}
+  input,select,textarea{padding:11px 12px}
+  nav{display:flex;gap:0;margin:0 6px calc(6px + env(safe-area-inset-bottom));padding:4px}
+  nav button{flex:1 1 0;min-width:0;min-height:52px;padding:6px 0 5px;font-size:.62rem;letter-spacing:-.01em}
+  nav button span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  nav button span.long{display:none}
+  nav button span.short{display:inline}
+  iframe.owui{height:calc(100dvh - 210px);min-height:420px}
+  #toast{bottom:calc(84px + env(safe-area-inset-bottom))}
+  details.card>summary{min-height:28px}
+  input[type=checkbox]{width:22px;height:22px}
+}
+@media (max-width:380px){.choices,.tiles{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -724,6 +785,20 @@ window.__hbAddon = "personal_ai_gateway";
 <main id="main"></main>
 <nav id="nav"></nav>
 <div id="toast" hidden></div>
+<div id="login" hidden>
+  <form class="login-card" id="loginform" autocomplete="on">
+    <div class="logo big"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 5.6L20 10l-5.6 2.4L12 18l-2.4-5.6L4 10l5.6-2.4L12 2zm7 13l1 2.3 2.3 1-2.3 1L19 21.6 18 19.3l-2.3-1 2.3-1L19 15z"/></svg></div>
+    <h1>Personal AI Gateway</h1>
+    <p class="muted" id="loginhint">Sign in to manage your providers, MCP servers and chat.</p>
+    <input type="text" name="username" autocomplete="username" value="admin" hidden>
+    <label class="f" for="pw">Password</label>
+    <div class="pwrow"><input id="pw" name="password" type="password" autocomplete="current-password" required autofocus>
+      <button type="button" class="b" id="pwshow" aria-label="Show password">Show</button></div>
+    <label class="switch"><input type="checkbox" id="remember" checked><span></span><b>Keep me signed in</b><small>90 days on this device</small></label>
+    <div class="err" id="loginerr" role="alert"></div>
+    <button class="b p wide" id="loginbtn" type="submit">Sign in</button>
+  </form>
+</div>
 <script>
 (() => {
   const $ = s => document.querySelector(s);
@@ -744,15 +819,8 @@ window.__hbAddon = "personal_ai_gateway";
   async function api(path, opts = {}) {
     const headers = { ...(opts.headers || {}) };
     if (opts.json !== undefined) { headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(opts.json); }
-    const t = sessionStorage.getItem('gw-token');
-    if (t) headers['X-Admin-Token'] = t;
-    const r = await fetch('api/' + path, { ...opts, headers });
-    if (r.status === 401) {
-      const p = prompt('Admin password (the proxy key unless you set an admin password)');
-      if (!p) throw new Error('Password required');
-      sessionStorage.setItem('gw-token', p);
-      return api(path, opts);
-    }
+    const r = await fetch('api/' + path, { ...opts, headers, credentials: 'same-origin' });
+    if (r.status === 401) { showLogin(); throw new Error('Signed out'); }
     if (opts.raw) return r;
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || r.statusText);
@@ -764,7 +832,7 @@ window.__hbAddon = "personal_ai_gateway";
   }
   const act = fn => async ev => {
     const b = ev?.currentTarget; if (b) b.disabled = true;
-    try { await fn(); } catch (e) { toast(e.message, true); } finally { if (b) b.disabled = false; }
+    try { await fn(); } catch (e) { if (e.message !== 'Signed out') toast(e.message, true); } finally { if (b) b.disabled = false; }
   };
   const copy = async text => {
     try { await navigator.clipboard.writeText(text); toast('Copied'); } catch (e) { prompt('Copy this:', text); }
@@ -783,6 +851,7 @@ window.__hbAddon = "personal_ai_gateway";
     chat: 'M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2z',
     settings: 'M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7 7 0 0 0-1.7-1L15 3h-4l-.4 2.9a7 7 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7 7 0 0 0 1.7 1L11 21h4l.4-2.9a7 7 0 0 0 1.7-1l2.5 1 2-3.5-2.2-1.6zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z'
   };
+  const SHORT = { overview: 'Home', providers: 'AIs' };
   const svgIcon = d => { const n = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); n.setAttribute('viewBox', '0 0 24 24'); n.setAttribute('aria-hidden', 'true'); const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', d); n.append(p); return n; };
   const tabs = () => [['overview', 'Overview'], ['providers', 'Providers'], ...(S && S.ollama && S.ollama.configured ? [['models', 'Models']] : []),
     ['routes', 'Routes'], ['devices', 'MCP'], ['chat', 'Chat'], ['settings', 'Settings']];
@@ -790,7 +859,8 @@ window.__hbAddon = "personal_ai_gateway";
     const list = tabs();
     $('#nav').style.setProperty('--n', list.length);
     $('#nav').replaceChildren(...list.map(([id, label]) =>
-      h('button', { type: 'button', 'aria-current': id === tab ? 'page' : null, onclick: () => { tab = id; show(); } }, svgIcon(ICONS[id]), h('span', {}, label))));
+      h('button', { type: 'button', 'aria-label': label, 'aria-current': id === tab ? 'page' : null, onclick: () => { tab = id; show(); } }, svgIcon(ICONS[id]),
+        h('span', { class: 'long' }, label), h('span', { class: 'short' }, SHORT[id] || label))));
   }
 
   async function show() {
@@ -1431,7 +1501,7 @@ window.__hbAddon = "personal_ai_gateway";
       h('div', { class: 'card' }, h('h3', {}, 'Proxy key'), h('p', { class: 'muted' }, 'Apps send this as their API key. Changing it signs out every app until you update them.'),
         h('div', { class: 'row' },
           h('button', { class: 'b', type: 'button', onclick: () => copy(S.proxy_key) }, 'Copy'),
-          h('button', { class: 'b d', type: 'button', onclick: act(async () => { if (!confirm('Create a new key? Apps using the old one will stop working.')) return; const r = await api('proxy-key/regenerate', { method: 'POST' }); sessionStorage.setItem('gw-token', r.proxy_key); toast('New key created'); show(); }) }, 'Generate a new key'))),
+          h('button', { class: 'b d', type: 'button', onclick: act(async () => { if (!confirm('Create a new key? Apps using the old one will stop working.')) return; await api('proxy-key/regenerate', { method: 'POST' }); toast('New key created'); show(); }) }, 'Generate a new key'))),
       h('div', { class: 'card' }, h('h3', {}, 'Key rotation'),
         ...field('Default mode', rot), ...field('Rest times after repeated failures (seconds, in order)', cool), ...field('Wait for a provider (seconds)', to)),
       h('details', { class: 'card', open: S.ollama.configured || null }, h('summary', {}, h('b', {}, 'Ollama (optional)'), h('span', { class: 'muted' }, S.ollama.configured ? ' · ' + S.ollama.url : ' · not used')),
@@ -1442,10 +1512,42 @@ window.__hbAddon = "personal_ai_gateway";
       h('button', { class: 'b p', type: 'button', onclick: act(async () => {
         await api('settings', { method: 'PUT', json: { rotation: rot.value, cooldowns: cool.value.split(',').map(x => x.trim()).filter(Boolean), timeout_s: to.value, ollama_url: ou.value, ollama_preload: pre.value } });
         toast('Saved'); show(); }) }, 'Save settings'),
+      AUTH.ingress ? null : h('div', { class: 'card' }, h('h3', {}, 'Signed in'),
+        h('p', { class: 'muted' }, `This device stays signed in. ${S.sessions} device${S.sessions === 1 ? '' : 's'} signed in right now.`),
+        h('div', { class: 'row' },
+          h('button', { class: 'b', type: 'button', onclick: act(async () => { await api('logout', { method: 'POST' }); showLogin(); }) }, 'Sign out'),
+          h('button', { class: 'b d', type: 'button', onclick: act(async () => { if (!confirm('Sign out every phone and computer, including this one?')) return; await api('logout-all', { method: 'POST' }); showLogin(); }) }, 'Sign out everywhere'))),
       h('p', { class: 'muted' }, `Up ${Math.round(S.uptime_s / 60)} min`));
   }
 
-  show();
+  // ------------------------------------------------------------ sign-in
+  let AUTH = { ingress: false };
+  function showLogin(msg) {
+    clearInterval(timer);
+    document.body.classList.add('signed-out');
+    $('#login').hidden = false;
+    $('#loginerr').textContent = msg || '';
+    if (AUTH.separate_password === false) $('#loginhint').textContent = 'Use your proxy key as the password (or set an admin password in the add-on options).';
+    setTimeout(() => $('#pw').focus(), 50);
+  }
+  $('#pwshow').onclick = () => { const p = $('#pw'); const show = p.type === 'password'; p.type = show ? 'text' : 'password'; $('#pwshow').textContent = show ? 'Hide' : 'Show'; };
+  $('#loginform').onsubmit = async ev => {
+    ev.preventDefault();
+    const btn = $('#loginbtn'); btn.disabled = true; $('#loginerr').textContent = '';
+    try {
+      const r = await fetch('api/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: $('#pw').value, remember: $('#remember').checked }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || 'Sign-in failed');
+      $('#pw').value = ''; $('#login').hidden = true; document.body.classList.remove('signed-out');
+      show();
+    } catch (e) { $('#loginerr').textContent = e.message; $('#pw').select(); }
+    finally { btn.disabled = false; }
+  };
+  (async () => {
+    try { AUTH = await (await fetch('api/auth', { credentials: 'same-origin' })).json(); } catch (e) {}
+    if (AUTH.signed_in) show(); else showLogin();
+  })();
 })();
 </script>
 </body>
