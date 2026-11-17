@@ -1,5 +1,5 @@
 name: Personal AI Gateway
-version: "1.9.0"
+version: "1.10.0"
 slug: personal_ai_gateway
 image: "ghcr.io/jonathangibson98/{arch}-addon-personal_ai_gateway"
 description: One OpenAI-compatible endpoint for your AI keys, Claude/ChatGPT/Gemini account sign-in without API keys, built-in Ollama, and MCP servers for your devices, your other computers (SSH) and any MCP tool you run
@@ -31,6 +31,7 @@ options:
   ollama_url: ""
   ollama_preload: ""
   api_keys: []
+  wallpaper: ""
 schema:
   builtin_ollama: bool
   ollama_keep_alive: str?
@@ -41,3 +42,4 @@ schema:
   api_keys:
     - provider: str
       key: password
+  wallpaper: str?
