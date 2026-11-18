@@ -1088,6 +1088,7 @@ window.__hbAddon = "personal_ai_gateway";
           h('h3', {}, lamp(a.signed_in ? 'ready' : a.installed ? 'cooling' : 'off'), a.label, h('span', { class: 'chip' }, a.signed_in ? 'signed in' : a.installed ? 'not signed in' : 'not installed')),
           a.version ? h('span', { class: 'muted' }, 'v' + a.version) : null),
         h('p', { class: 'muted', style: 'margin:0 0 6px' }, a.plan, a.signed_in ? ` · model names: ${a.models.map(m => a.provider + '/' + m).join(', ')}` : ''),
+        a.notice ? h('p', { style: 'margin:0 0 8px;padding:8px 10px;border-radius:10px;border:1px solid rgba(255,190,90,.5);background:rgba(255,190,90,.12);font-size:13px' }, '⚠️ ' + a.notice) : null,
         h('div', { class: 'row' },
           h('button', { class: 'b' + (a.installed ? '' : ' p'), type: 'button', onclick: act(async () => { openSession(win, await api(`accounts/${a.id}/install`, { method: 'POST' }), () => accountsSection(box)); }) }, a.installed ? 'Update' : 'Install'),
           a.installed ? h('button', { class: 'b' + (a.signed_in ? '' : ' p'), type: 'button', onclick: act(async () => { openSession(win, await api(`accounts/${a.id}/login`, { method: 'POST' }), () => accountsSection(box)); }) }, a.signed_in ? 'Sign in again' : 'Sign in') : null,
