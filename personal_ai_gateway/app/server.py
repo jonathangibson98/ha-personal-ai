@@ -30,7 +30,7 @@ from tunnel import Tunnel
 from upstream import Gateway, err, sanitize
 
 VERSION = "2.1.0"
-TEST_MODELS = {"gemini": "gemini-2.5-flash", "openai": "gpt-4o-mini", "groq": "llama-3.3-70b-versatile",
+TEST_MODELS = {"gemini": "gemini-flash-latest", "openai": "gpt-4o-mini", "groq": "llama-3.3-70b-versatile",
                "mistral": "mistral-small-latest", "deepseek": "deepseek-chat", "cerebras": "llama3.1-8b"}
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("gateway")

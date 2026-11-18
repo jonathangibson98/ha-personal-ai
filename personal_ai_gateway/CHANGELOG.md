@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.2 - 2026-11-17
+
+- **Gemini account: clear message instead of Google's cut-off error.** Since June 2026, Google doesn't let personal Google accounts (free or Google AI Pro/Ultra) use Gemini CLI; it sends them to its Antigravity apps. The Gemini account card now says so and points to the fix: add Gemini with a free API key from aistudio.google.com/apikey. Work accounts with Gemini Code Assist Standard or Enterprise still work.
+- Gemini account model list updated (gemini-3.5-flash, gemini-3.1-pro-preview); the Gemini API key test uses `gemini-flash-latest`.
+
 ## 2.1.1 - 2026-11-17
 
 - **Easier to read over wallpapers.** The page checks how bright the wallpaper is and tints behind the text just enough to keep it readable: bright wallpapers get more, dark ones barely any.

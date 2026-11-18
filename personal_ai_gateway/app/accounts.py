@@ -50,9 +50,12 @@ ACCOUNTS = {
         "login": ["login", "--device-auth"], "logout": ["logout"],
     },
     "gemini": {
-        "label": "Gemini", "plan": "Google account (free tier or Google AI plan)", "provider": "gemini-account",
+        "label": "Gemini", "plan": "Gemini Code Assist Standard or Enterprise (work) account", "provider": "gemini-account",
         "package": "@google/gemini-cli", "bin": "gemini",
-        "models": ["default", "gemini-2.5-pro", "gemini-2.5-flash"],
+        "models": ["default", "gemini-3.5-flash", "gemini-3.1-pro-preview"],
+        "notice": "Google stopped letting personal Google accounts (free or Google AI Pro/Ultra) sign in to Gemini CLI in June 2026; "
+                  "they now have to use Google's Antigravity apps instead. For Home Assistant, use Gemini with a free API key: "
+                  "get one at aistudio.google.com/apikey and add it under Providers as \"gemini\".",
         "login": [], "logout": None,
     },
 }
@@ -275,7 +278,7 @@ class Accounts:
                         "installed": installed, "version": await self.version(acct) if installed else "",
                         "signed_in": await self.signed_in(acct) if installed else False,
                         "in_providers": a["provider"] in self.store.providers(),
-                        "models": a["models"]})
+                        "models": a["models"], "notice": a.get("notice", "")})
         return out
 
     # -- install / sign in / sign out
@@ -480,11 +483,23 @@ class Accounts:
             data = {}
         if data.get("error"):
             e = data["error"]
-            raise CliError("Gemini: " + str(e.get("message") if isinstance(e, dict) else e))
+            raise CliError(self._gemini_retired(str(e.get("message") if isinstance(e, dict) else e)) or "Gemini: " + str(e.get("message") if isinstance(e, dict) else e))
         text = data.get("response")
         if code != 0 or not isinstance(text, str):
+            retired = self._gemini_retired(out + "\n" + err)
+            if retired:
+                raise CliError(retired)
             raise CliError(self._problem("Gemini", code, out, err))
         return text
+
+    @staticmethod
+    def _gemini_retired(text: str) -> str:
+        """Google's 'migrate to Antigravity' refusal for personal accounts, in plain words."""
+        if re.search(r"antigravity|IneligibleOrProjectId|UNSUPPORTED_CLIENT|not eligible for Gemini Code Assist", text or "", re.I):
+            return ("Gemini account sign-in no longer works for personal Google accounts: Google moved them from Gemini CLI to its "
+                    "Antigravity apps in June 2026. Use Gemini with a free API key instead (aistudio.google.com/apikey, then "
+                    "Providers > add \"gemini\"), and remove gemini-account from your providers.")
+        return ""
 
     @staticmethod
     def _problem(label, code, out, err) -> str:
