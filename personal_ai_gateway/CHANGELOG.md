@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.3 - 2026-11-25
+
+- **Gemini setup is now a guided card.** On the Gemini account card there is a 3-step guide (get a free key at aistudio.google.com/apikey, paste it, test it) with a key box and **Add Gemini** and **Test** buttons right there, so you no longer have to find the Add provider form or know to name it "gemini". Shows a green check once a key is added, and **Add another key** lets the gateway rotate between several free keys.
+
 ## 2.1.2 - 2026-11-17
 
 - **Gemini account: clear message instead of Google's cut-off error.** Since June 2026, Google doesn't let personal Google accounts (free or Google AI Pro/Ultra) use Gemini CLI; it sends them to its Antigravity apps. The Gemini account card now says so and points to the fix: add Gemini with a free API key from aistudio.google.com/apikey. Work accounts with Gemini Code Assist Standard or Enterprise still work.

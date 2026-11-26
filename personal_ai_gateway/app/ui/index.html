@@ -1076,6 +1076,34 @@ window.__hbAddon = "personal_ai_gateway";
       out);
   }
 
+  // Step-by-step Gemini setup with a free API key (the sign-in route is closed to personal Google accounts)
+  function geminiGuide() {
+    const p = (S && S.providers || {}).gemini, have = !!(p && (p.keys || []).length);
+    const key = h('input', { type: 'password', placeholder: 'Paste the key here (starts with AIza…)', autocomplete: 'off' });
+    const out = h('div', { class: 'muted', style: 'margin-top:8px' });
+    const step = (n, ...c) => h('li', { style: 'margin:0 0 8px' }, ...c);
+    return h('details', { class: 'card', style: 'margin:0 0 10px', open: !have },
+      h('summary', { style: 'cursor:pointer;font-weight:600' }, have ? '✅ Gemini API key added: how to use or change it' : 'Set up Gemini with a free API key (3 steps, 2 minutes)'),
+      h('ol', { style: 'margin:10px 0 0;padding-left:20px;font-size:14px;line-height:1.5' },
+        step(1, 'Open ', h('a', { href: 'https://aistudio.google.com/apikey', target: '_blank', rel: 'noopener', style: 'color:var(--accent,#9bb0ff)' }, 'aistudio.google.com/apikey'),
+          ' and sign in with any Google account (your normal personal one is fine). Tap ', h('b', {}, 'Create API key'), ', pick any project (or let it make one), then ', h('b', {}, 'Copy'), ' the key.'),
+        step(2, 'Paste the key below and tap ', h('b', {}, 'Add Gemini'), '. This adds a provider named ', h('b', {}, 'gemini'), ' for you, so you do not need the Add provider form.'),
+        step(3, 'Tap ', h('b', {}, 'Test'), '. You should see "ok". Then, in Home Assistant, use a model name like ', h('code', {}, 'gemini/gemini-flash-latest'), ' or ', h('code', {}, 'gemini/gemini-2.5-pro'), ' (the exact list shows on the gemini provider card below).')),
+      h('div', { style: 'margin-top:10px' }, key),
+      h('div', { class: 'row', style: 'margin-top:8px' },
+        h('button', { class: 'b p', type: 'button', onclick: act(async () => {
+          if (!key.value.trim()) throw new Error('Paste your key first.');
+          await api('providers', { method: 'POST', json: { name: 'gemini', kind: 'openai', base_url: S.presets.gemini.base_url, key: key.value.trim() } });
+          key.value = ''; toast('Gemini added'); show();
+        }) }, have ? 'Add another key' : 'Add Gemini'),
+        have ? h('button', { class: 'b', type: 'button', onclick: act(async () => {
+          out.textContent = 'Testing…'; const r = await api('providers/gemini/test', { method: 'POST', json: { model: 'gemini-flash-latest' } });
+          out.textContent = r.ok ? `✅ Works: ${r.model} replied "${r.reply}" in ${r.ms} ms` : '❌ ' + (r.error || 'Failed');
+        }) }, 'Test') : null),
+      out,
+      h('p', { class: 'muted', style: 'margin:10px 0 0;font-size:12px' }, 'Free keys have daily limits. If you hit them, add a second key from another Google account with ', h('b', {}, 'Add another key'), ' and the gateway rotates between them. Keep keys private; anyone with the key can use your quota.'));
+  }
+
   // ------------------------------------------------------------ sign in with an account
   async function accountsSection(box) {
     const { accounts, sessions } = await api('accounts');
@@ -1089,6 +1117,7 @@ window.__hbAddon = "personal_ai_gateway";
           a.version ? h('span', { class: 'muted' }, 'v' + a.version) : null),
         h('p', { class: 'muted', style: 'margin:0 0 6px' }, a.plan, a.signed_in ? ` · model names: ${a.models.map(m => a.provider + '/' + m).join(', ')}` : ''),
         a.notice ? h('p', { style: 'margin:0 0 8px;padding:8px 10px;border-radius:10px;border:1px solid rgba(255,190,90,.5);background:rgba(255,190,90,.12);font-size:13px' }, '⚠️ ' + a.notice) : null,
+        a.id === 'gemini' && !a.signed_in ? geminiGuide() : null,
         h('div', { class: 'row' },
           h('button', { class: 'b' + (a.installed ? '' : ' p'), type: 'button', onclick: act(async () => { openSession(win, await api(`accounts/${a.id}/install`, { method: 'POST' }), () => accountsSection(box)); }) }, a.installed ? 'Update' : 'Install'),
           a.installed ? h('button', { class: 'b' + (a.signed_in ? '' : ' p'), type: 'button', onclick: act(async () => { openSession(win, await api(`accounts/${a.id}/login`, { method: 'POST' }), () => accountsSection(box)); }) }, a.signed_in ? 'Sign in again' : 'Sign in') : null,

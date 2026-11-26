@@ -55,7 +55,7 @@ ACCOUNTS = {
         "models": ["default", "gemini-3.5-flash", "gemini-3.1-pro-preview"],
         "notice": "Google stopped letting personal Google accounts (free or Google AI Pro/Ultra) sign in to Gemini CLI in June 2026; "
                   "they now have to use Google's Antigravity apps instead. For Home Assistant, use Gemini with a free API key: "
-                  "get one at aistudio.google.com/apikey and add it under Providers as \"gemini\".",
+                  "get one at aistudio.google.com/apikey and add it under Providers as \"gemini\". Step-by-step setup is right below.",
         "login": [], "logout": None,
     },
 }
